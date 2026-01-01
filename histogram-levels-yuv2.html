@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Niveaux YUV – Outil simple (HTML+JS pur)</title>
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --ink:#1f2937; --muted:#6b7280; --accent:#2563eb; --ok:#10b981; --warn:#f59e0b; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;background:var(--bg);color:var(--ink)}
+  .wrap{max-width:1150px;margin:24px auto;padding:16px}
+  .card{background:var(--card);border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.06);padding:16px}
+  h1{font-size:20px;margin:0 0 12px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .controls .spacer{flex:1}
+  .btn{appearance:none;border:0;border-radius:10px;background:var(--accent);color:#fff;padding:10px 14px;cursor:pointer}
+  .btn.secondary{background:var(--ok)}
+  .btn.ghost{background:#e5e7eb;color:#111}
+  .row{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}
+  #imgCanvas{width:100%;height:auto;display:block;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+  .panel{display:grid;gap:12px}
+  .hist{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px}
+  .hist h3{font-size:14px;margin:0 0 8px;color:var(--muted)}
+  canvas.histCanvas{width:100%;height:140px;display:block}
+  .legend{font-size:12px;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .pill{padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}
+  .vals{font-size:12px;color:#111;background:#f3f4f6;border-radius:8px;padding:4px 8px}
+  .footer{font-size:12px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>Niveaux YUV – Sélection manuelle (début/fin) sur Y</h1>
+    <div class="controls">
+      <input id="fileInput" type="file" accept="image/*" class="btn ghost">
+      <button id="resetBtn" class="btn ghost">Réinitialiser</button>
+      <div class="spacer"></div>
+      <span class="vals">Début Y: <span id="lowVal">0</span></span>
+      <span class="vals">Fin Y: <span id="highVal">255</span></span>
+      <button id="saveBtn" class="btn secondary">Sauvegarder l'image</button>
+    </div>
+    <div class="row">
+      <canvas id="imgCanvas" width="900" height="600"></canvas>
+      <div class="panel">
+        <div class="hist">
+          <h3>Histogramme Luminance (Y)</h3>
+          <canvas id="yHist" class="histCanvas" width="512" height="140"></canvas>
+          <div class="legend">
+            <span class="pill">Cliquer & glisser pour régler le début/fin</span>
+            <span>• Glisser les poignées bleues • Double‑clic pour réinitialiser</span>
+          </div>
+        </div>
+        <div class="hist">
+          <h3>Histogramme Chrominance U</h3>
+          <canvas id="uHist" class="histCanvas" width="512" height="140"></canvas>
+        </div>
+        <div class="hist">
+          <h3>Histogramme Chrominance V</h3>
+          <canvas id="vHist" class="histCanvas" width="512" height="140"></canvas>
+        </div>
+        <div class="footer">Conversion BT.601 approx. – Y = 0.299R + 0.587G + 0.114B</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- Helpers ---
+const clamp = (v,min,max)=>v<min?min:(v>max?max:v);
+
+// BT.601 (approx) RGB[0..255] -> YUV
+function rgbToYuv(r,g,b){
+  const y = 0.299*r + 0.587*g + 0.114*b;
+  const u = -0.168736*r - 0.331264*g + 0.5*b + 128;
+  const v = 0.5*r - 0.418688*g - 0.081312*b + 128;
+  return [y,u,v];
+}
+// YUV -> RGB
+function yuvToRgb(y,u,v){
+  const r = y + 1.402*(v-128);
+  const g = y - 0.344136*(u-128) - 0.714136*(v-128);
+  const b = y + 1.772*(u-128);
+  return [clamp(Math.round(r),0,255),clamp(Math.round(g),0,255),clamp(Math.round(b),0,255)];
+}
+
+// --- State ---
+const imgCanvas = document.getElementById('imgCanvas');
+const imgCtx = imgCanvas.getContext('2d', { willReadFrequently: true });
+const yHistCanvas = document.getElementById('yHist');
+const uHistCanvas = document.getElementById('uHist');
+const vHistCanvas = document.getElementById('vHist');
+const yCtx = yHistCanvas.getContext('2d');
+const uCtx = uHistCanvas.getContext('2d');
+const vCtx = vHistCanvas.getContext('2d');
+
+const lowValEl = document.getElementById('lowVal');
+const highValEl = document.getElementById('highVal');
+
+let originalImageData = null;   // pixels d'origine
+let processedImageData = null;  // pixels traités
+let yHist = new Array(256).fill(0);
+let uHist = new Array(256).fill(0);
+let vHist = new Array(256).fill(0);
+
+// bornes sélectionnées (début/fin) sur Y
+let lowY = 220;
+let highY = 252;
+
+// --- Charger une image ---
+document.getElementById('fileInput').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      // Adapter le canvas à l'image (limiter la taille pour rester fluide)
+      const maxW = 1400, maxH = 1000;
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const scale = Math.min(maxW/w, maxH/h, 1);
+      w = Math.round(w*scale); h = Math.round(h*scale);
+      imgCanvas.width = w; imgCanvas.height = h;
+      imgCtx.clearRect(0,0,w,h);
+      imgCtx.drawImage(img, 0,0, w,h);
+      originalImageData = imgCtx.getImageData(0,0,w,h);
+      computeHistograms();
+      applyLevelsAndRender();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// --- Réinitialiser ---
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  lowY = 220; highY = 253; updateHandlesLabel();
+  if(originalImageData){
+    computeHistograms();
+    applyLevelsAndRender();
+  } else {
+    imgCtx.clearRect(0,0,imgCanvas.width,imgCanvas.height);
+  }
+});
+
+// --- Sauvegarder ---
+document.getElementById('saveBtn').addEventListener('click', ()=>{
+  if(!processedImageData && originalImageData){
+    applyLevelsAndRender();
+  }
+  // Export du canvas (pixels traités)
+  imgCanvas.toBlob(blob=>{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'image_yuv_niveaux.png';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+});
+
+function updateHandlesLabel(){
+  lowValEl.textContent = Math.round(lowY);
+  highValEl.textContent = Math.round(highY);
+}
+
+// --- Histogrammes ---
+function computeHistograms(){
+  yHist.fill(0); uHist.fill(0); vHist.fill(0);
+  if(!originalImageData) { drawHistograms(); return; }
+  const d = originalImageData.data;
+  for(let i=0;i<d.length;i+=4){
+    const r=d[i], g=d[i+1], b=d[i+2];
+    const [y,u,v] = rgbToYuv(r,g,b);
+    yHist[clamp(Math.round(y),0,255)]++;
+    uHist[clamp(Math.round(u),0,255)]++;
+    vHist[clamp(Math.round(v),0,255)]++;
+  }
+  drawHistograms();
+}
+
+function drawSingleHistogram(ctx, hist, color){
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.clearRect(0,0,W,H);
+  // fond
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0,0,W,H);
+  // lignes guides
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.beginPath();
+  for(let i=0;i<=4;i++){
+    const y = (H-10) * i/4 + 5;
+    ctx.moveTo(5, y); ctx.lineTo(W-5, y);
+  }
+  ctx.stroke();
+  const maxVal = Math.max(...hist) || 1;
+  const barW = (W-10)/256;
+  ctx.fillStyle = color;
+  for(let i=0;i<256;i++){
+    const h = (H-12) * (hist[i]/maxVal);
+    const x = 5 + i*barW;
+    ctx.fillRect(x, H-6-h, Math.max(1,barW*0.95), h);
+  }
+}
+
+function drawHistograms(){
+  drawSingleHistogram(yCtx, yHist, '#3b82f6');
+  drawYHandles(); // superposer poignées sur Y
+  drawSingleHistogram(uCtx, uHist, '#10b981');
+  drawSingleHistogram(vCtx, vHist, '#f59e0b');
+}
+
+function drawYHandles(){
+  const ctx = yCtx;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const barW = (W-10)/256;
+  const x1 = 5 + lowY * barW;
+  const x2 = 5 + highY * barW;
+  ctx.save();
+  // zone sélectionnée
+  ctx.fillStyle = 'rgba(37,99,235,0.12)';
+  ctx.fillRect(Math.min(x1,x2), 0, Math.abs(x2-x1), H);
+  // poignées
+  ctx.strokeStyle = '#2563eb';
+  ctx.lineWidth = 2;
+  [x1,x2].forEach(x=>{
+    ctx.beginPath();
+    ctx.moveTo(x, 0); ctx.lineTo(x, H);
+    ctx.stroke();
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(x-4, H-14, 8, 12);
+  });
+  ctx.restore();
+}
+
+// --- Interaction souris sur histogramme Y ---
+let dragging = null; // 'low' | 'high' | null
+
+yHistCanvas.addEventListener('mousedown', (e)=>{
+  const {x} = relX(e, yHistCanvas);
+  const pos = xToYValue(x);
+  // poignée la plus proche
+  const distLow = Math.abs(pos - lowY);
+  const distHigh = Math.abs(pos - highY);
+  dragging = (distLow <= distHigh) ? 'low' : 'high';
+  updateHandleFromX(x);
+});
+
+yHistCanvas.addEventListener('mousemove', (e)=>{
+  if(!dragging) return;
+  const {x} = relX(e, yHistCanvas);
+  updateHandleFromX(x);
+});
+
+['mouseup','mouseleave'].forEach(ev =>
+  yHistCanvas.addEventListener(ev, ()=> dragging=null)
+);
+
+yHistCanvas.addEventListener('dblclick', ()=>{
+  lowY = 0; highY = 255; updateHandlesLabel(); drawHistograms(); if(originalImageData) applyLevelsAndRender();
+});
+
+function relX(e, canvas){
+  const rect = canvas.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top, w: rect.width, h: rect.height };
+}
+
+function xToYValue(x){
+  const W = yHistCanvas.width;
+  const barW = (W-10)/256;
+  let idx = Math.round((x-5)/barW);
+  return clamp(idx,0,255);
+}
+
+function updateHandleFromX(x){
+  const val = xToYValue(x);
+  if(dragging==='low'){
+    lowY = Math.min(val, highY-1);
+  } else if(dragging==='high'){
+    highY = Math.max(val, lowY+1);
+  }
+  updateHandlesLabel();
+  drawHistograms();
+  if(originalImageData) applyLevelsAndRender();
+}
+
+// --- Application des niveaux (étirement du Y entre lowY..highY) ---
+function applyLevelsAndRender(){
+  const src = originalImageData;
+  if(!src) return;
+  const w = src.width, h = src.height;
+  processedImageData = new ImageData(w, h);
+  const s = src.data, d = processedImageData.data;
+
+  const lo = lowY, hi = highY, span = Math.max(1, hi - lo);
+  // LUT pour Y
+  const lut = new Uint8ClampedArray(256);
+  for(let i=0;i<256;i++){
+    let y = ((i - lo) / span) * 255.0;
+    lut[i] = clamp(Math.round(y), 0, 255);
+  }
+
+  for(let i=0, j=0;i<s.length;i+=4, j+=4){
+    const r=s[i], g=s[i+1], b=s[i+2], a=s[i+3];
+    const yuv = rgbToYuv(r,g,b);
+    const yAdj = lut[clamp(Math.round(yuv[0]),0,255)];
+    const rgb = yuvToRgb(yAdj, yuv[1], yuv[2]);
+    d[j]=rgb[0]; d[j+1]=rgb[1]; d[j+2]=rgb[2]; d[j+3]=a;
+  }
+  imgCtx.putImageData(processedImageData, 0, 0);
+}
+
+// --- Démo si aucune image chargée ---
+(function demo(){
+  const w=900,h=500;
+  imgCanvas.width=w; imgCanvas.height=h;
+  const grd=imgCtx.createLinearGradient(0,0,w,0);
+  grd.addColorStop(0,"#101010");
+  grd.addColorStop(0.4,"#404040");
+  grd.addColorStop(0.6,"#b0b0b0");
+  grd.addColorStop(1,"#ffffff");
+  imgCtx.fillStyle=grd; imgCtx.fillRect(0,0,w,h);
+  // damier faible contraste
+  imgCtx.globalAlpha=0.08;
+  for(let y=0;y<h;y+=20){
+    for(let x=0;x<w;x+=20){
+      if(((x+y)/20)%2<1) imgCtx.fillStyle="#000"; else imgCtx.fillStyle="#fff";
+      imgCtx.fillRect(x,y,20,20);
+    }
+  }
+  imgCtx.globalAlpha=1;
+  originalImageData = imgCtx.getImageData(0,0,w,h);
+  computeHistograms();
+  applyLevelsAndRender();
+})();
+</script>
+</body>
+</html>
