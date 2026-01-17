@@ -1,53 +1,48 @@
+ 📸 Photo
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#)
+[![Pure HTML/JS](https://img.shields.io/badge/Pure-HTML%2FJS-blue.svg)](#)
+[![Image Processing](https://img.shields.io/badge/Domain-Image%20Processing-purple.svg)](#)
 
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+**Perspective correction and image alignment tool** for OCR and AI preprocessing.
 
-Outils légers de traitement photo, 100% client-side (HTML/JS pur, aucune dépendance).
+![Screenshot](screenshot.png)
 
-## Outils
+## 🚀 Features
 
-### Niveaux YUV (`histogram-levels-yuv2.html`)
+- **4-Point Perspective Correction** — Select corners, straighten documents
+- **Automatic Edge Detection** — Smart document boundary detection
+- **Rotation & Deskew** — Fix tilted scans
+- **Crop & Export** — Save corrected images
+- **Real-time Preview** — See results before applying
+- **Touch Support** — Works on tablets
 
-Ajustement des niveaux de luminance dans l'espace colorimétrique YUV.
+## 🛠️ Tech Stack
 
-**Fonctionnalités :**
-- Conversion RGB ↔ YUV (BT.601)
-- Histogrammes temps réel : Luminance (Y), Chrominance U et V
-- Sélection interactive début/fin sur Y (drag des poignées ou double-clic pour reset)
-- Étirement automatique de la plage de luminance
-- Export PNG
+- Pure HTML/CSS/JavaScript
+- Canvas-based image manipulation
+- Homography transformation
+- No external dependencies
 
-**Cas d'usage :** Récupérer du contraste sur des photos sous-exposées ou délavées, visualiser la distribution colorimétrique.
+## 📖 Usage
 
----
+1. Open \`index.html\` in your browser
+2. Load an image (drag & drop or file picker)
+3. Click the 4 corners of the document
+4. Adjust if needed
+5. Export the corrected image
 
-### Correction de Perspective (`perspective-correction-filtres.html`)
+## 🎓 Use Cases
 
-Redressement géométrique et filtres basiques.
+- **OCR Preprocessing** — Straighten documents before text recognition
+- **AI Input** — Normalize images for machine learning
+- **Document Scanning** — Fix perspective from phone photos
+- **Archive Digitization** — Correct old scanned documents
 
-**Contrôles géométriques :**
-- Rotation X/Y/Z (-180° à +180°)
-- Perspective (distance focale simulée)
-- Échelle (0.5x à 2x)
-- Inclinaison X/Y (skew)
+## 📄 License
 
-**Filtres :**
-- Inversion (négatif progressif 0-100%)
-- Contraste (50-200%)
+MIT
 
-**Cas d'usage :** Redresser une photo prise en contre-plongée, corriger des lignes de fuite, numériser des documents photographiés de biais.
+## 👤 Author
 
----
-
-## Utilisation
-
-1. Ouvrir le fichier HTML dans un navigateur (Chrome, Firefox, Edge)
-2. Charger une image via le bouton ou drag & drop
-3. Ajuster les paramètres
-4. Sauvegarder le résultat
-
-Aucune installation requise. Fonctionne hors-ligne.
-
-## Licence
-
-CC BY-NC 4.0 — Usage non-commercial, attribution requise.
+**Eric PERRET** — [GitHub](https://github.com/ericperret)
