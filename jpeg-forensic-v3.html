@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JPEG Forensic Analyzer v3</title>
+<style>
+:root{--bg:#0a0c10;--panel:#12151c;--border:#1e2433;--accent:#00e5a0;--warn:#ff6b4a;--alert:#ff2d55;--info:#4a9eff;--dim:#5a6378;--text:#c8cdd8;--bright:#edf0f7;--dec:#e0c866;--social:#c792ea;--mono:'Courier New',monospace}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.5}
+header{background:var(--panel);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:16px}
+header h1{font-size:15px;color:var(--accent);font-weight:700;letter-spacing:2px;text-transform:uppercase}
+header .sub{color:var(--dim);font-size:11px}
+#toolbar{padding:16px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+#toolbar label{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:10px 18px;cursor:pointer}
+#toolbar label:hover{border-color:var(--accent)}
+#toolbar label span{color:var(--accent)}
+#toolbar input[type=file]{display:none}
+#status{color:var(--dim);font-size:12px}#status.err{color:var(--alert)}#status.ok{color:var(--accent)}
+#pz{display:none;padding:0 20px;margin-bottom:16px}
+#pz .flex{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+#pz canvas{border:1px solid var(--border);border-radius:6px;background:#000}
+#pi{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;min-width:280px;max-width:400px}
+#pi .r{display:flex;justify-content:space-between;padding:3px 0;gap:12px}
+#pi .l{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+#pi .v{color:var(--bright);text-align:right;word-break:break-all}
+#pi .v.soc{color:var(--social)}
+#pi .v.dev{color:var(--accent)}
+#results{padding:0 20px 40px}
+.social-box{border:1px solid var(--social);border-radius:6px;padding:14px 16px;margin-bottom:16px;background:rgba(199,146,234,.06)}
+.social-box h3{color:var(--social);font-size:13px;margin-bottom:8px}
+.social-box .det{color:var(--text);padding:2px 0}
+.social-box .conf{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;margin-left:8px}
+.social-box .conf.high{background:rgba(255,45,85,.2);color:var(--alert)}
+.social-box .conf.med{background:rgba(255,107,74,.2);color:var(--warn)}
+.social-box .conf.low{background:rgba(90,99,120,.3);color:var(--dim)}
+.map-box{border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:16px}
+.map-box h3{background:var(--panel);padding:10px 16px;font-size:12px;color:var(--bright);text-transform:uppercase;letter-spacing:1px}
+.map-box iframe{width:100%;height:300px;border:none;display:block}
+.map-box .coords{padding:8px 16px;background:var(--panel);font-size:12px;color:var(--info)}
+.ss{border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:16px}
+.ss.clean{border-color:var(--accent);background:rgba(0,229,160,.06)}
+.ss.suspect{border-color:var(--warn);background:rgba(255,107,74,.06)}
+.ss.alert{border-color:var(--alert);background:rgba(255,45,85,.08)}
+.ss h3{font-size:13px;margin-bottom:8px}
+.ss.clean h3{color:var(--accent)}.ss.suspect h3{color:var(--warn)}.ss.alert h3{color:var(--alert)}
+.si{padding:4px 0;display:flex;gap:10px;align-items:baseline}
+.si .d{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.si .d.g{background:var(--accent)}.si .d.o{background:var(--warn)}.si .d.r{background:var(--alert)}
+.S{border:1px solid var(--border);border-radius:6px;margin-bottom:10px;overflow:hidden}
+.S .h{background:var(--panel);padding:10px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+.S .h:hover{background:#181c26}
+.S .h h3{font-size:12px;color:var(--bright);text-transform:uppercase;letter-spacing:1px}
+.S .h .b{background:var(--border);color:var(--dim);font-size:10px;padding:2px 8px;border-radius:10px}
+.S .h .b.warn{background:rgba(255,107,74,.15);color:var(--warn)}
+.S .h .b.alert{background:rgba(255,45,85,.15);color:var(--alert)}
+.S .bd{display:none;padding:12px 16px;border-top:1px solid var(--border);max-height:700px;overflow-y:auto}
+.S.open .bd{display:block}
+table.t{width:100%;border-collapse:collapse;font-size:12px}
+table.t th{text-align:left;padding:4px 8px 4px 0;color:var(--dim);font-weight:400;font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+table.t td{padding:4px 8px 4px 0;border-bottom:1px solid rgba(30,36,51,.5);vertical-align:top}
+td.off{color:var(--info)}td.mk{color:var(--accent)}td.vl{color:var(--bright);word-break:break-all;max-width:350px}
+td.dc{color:var(--dec);font-style:italic;max-width:300px}
+.hd{background:#080a0e;border:1px solid var(--border);border-radius:4px;padding:10px;font-size:11px;overflow-x:auto;white-space:pre;color:var(--dim);max-height:300px;overflow-y:auto;margin-top:6px}
+.eb{display:flex;height:20px;border-radius:3px;overflow:hidden;margin:6px 0;border:1px solid var(--border)}.eb div{height:100%}
+.tp{margin-top:8px;max-width:200px;border:1px solid var(--border);border-radius:4px}
+</style>
+</head>
+<body>
+<header><h1>JPEG Forensic v3</h1><span class="sub">Tags exhaustifs &middot; Stego &middot; Social Network &middot; GPS Map &middot; Device ID</span></header>
+<div id="toolbar"><label><span>&#9654; Charger JPEG</span><input type="file" id="fi" accept=".jpg,.jpeg,.jfif"></label><div id="status">En attente...</div></div>
+<div id="pz"><div class="flex"><canvas id="cv"></canvas><div id="pi"></div></div></div>
+<div id="results"></div>
+<script>
+/* ================================================================
+   DEVICE MODEL DATABASE (code interne -> nom commercial)
+   ================================================================ */
+var DEV_SAMSUNG={
+'SM-G960':'Galaxy S9','SM-G965':'Galaxy S9+',
+'SM-G970':'Galaxy S10e','SM-G973':'Galaxy S10','SM-G975':'Galaxy S10+','SM-G977':'Galaxy S10 5G',
+'SM-G980':'Galaxy S20','SM-G981':'Galaxy S20 5G','SM-G985':'Galaxy S20+','SM-G986':'Galaxy S20+ 5G','SM-G988':'Galaxy S20 Ultra',
+'SM-G991':'Galaxy S21','SM-G996':'Galaxy S21+','SM-G998':'Galaxy S21 Ultra',
+'SM-S901':'Galaxy S22','SM-S906':'Galaxy S22+','SM-S908':'Galaxy S22 Ultra',
+'SM-S911':'Galaxy S23','SM-S916':'Galaxy S23+','SM-S918':'Galaxy S23 Ultra',
+'SM-S921':'Galaxy S24','SM-S926':'Galaxy S24+','SM-S928':'Galaxy S24 Ultra',
+'SM-S931':'Galaxy S25','SM-S936':'Galaxy S25+','SM-S938':'Galaxy S25 Ultra',
+'SM-F700':'Galaxy Z Flip','SM-F707':'Galaxy Z Flip 5G','SM-F711':'Galaxy Z Flip3','SM-F721':'Galaxy Z Flip4','SM-F731':'Galaxy Z Flip5','SM-F741':'Galaxy Z Flip6',
+'SM-F900':'Galaxy Fold','SM-F916':'Galaxy Z Fold2','SM-F926':'Galaxy Z Fold3','SM-F936':'Galaxy Z Fold4','SM-F946':'Galaxy Z Fold5','SM-F956':'Galaxy Z Fold6',
+'SM-N950':'Galaxy Note8','SM-N960':'Galaxy Note9','SM-N970':'Galaxy Note10','SM-N975':'Galaxy Note10+','SM-N980':'Galaxy Note20','SM-N985':'Galaxy Note20 Ultra','SM-N986':'Galaxy Note20 Ultra 5G',
+'SM-A105':'Galaxy A10','SM-A125':'Galaxy A12','SM-A135':'Galaxy A13','SM-A145':'Galaxy A14',
+'SM-A155':'Galaxy A15','SM-A205':'Galaxy A20','SM-A217':'Galaxy A21s','SM-A225':'Galaxy A22',
+'SM-A235':'Galaxy A23','SM-A245':'Galaxy A24','SM-A256':'Galaxy A25','SM-A305':'Galaxy A30',
+'SM-A315':'Galaxy A31','SM-A325':'Galaxy A32','SM-A336':'Galaxy A33','SM-A346':'Galaxy A34',
+'SM-A356':'Galaxy A35','SM-A505':'Galaxy A50','SM-A515':'Galaxy A51','SM-A525':'Galaxy A52',
+'SM-A526':'Galaxy A52 5G','SM-A536':'Galaxy A53','SM-A546':'Galaxy A54','SM-A556':'Galaxy A55',
+'SM-A705':'Galaxy A70','SM-A715':'Galaxy A71','SM-A725':'Galaxy A72',
+'SM-T870':'Galaxy Tab S7','SM-T970':'Galaxy Tab S7+','SM-X700':'Galaxy Tab S8','SM-X800':'Galaxy Tab S8+','SM-X900':'Galaxy Tab S8 Ultra'
+};
+
+var DEV_APPLE={
+'iPhone1,1':'iPhone','iPhone1,2':'iPhone 3G','iPhone2,1':'iPhone 3GS',
+'iPhone3,1':'iPhone 4','iPhone4,1':'iPhone 4S','iPhone5,1':'iPhone 5','iPhone5,3':'iPhone 5c','iPhone6,1':'iPhone 5s',
+'iPhone7,1':'iPhone 6 Plus','iPhone7,2':'iPhone 6','iPhone8,1':'iPhone 6s','iPhone8,2':'iPhone 6s Plus','iPhone8,4':'iPhone SE',
+'iPhone9,1':'iPhone 7','iPhone9,2':'iPhone 7 Plus','iPhone10,1':'iPhone 8','iPhone10,2':'iPhone 8 Plus','iPhone10,3':'iPhone X',
+'iPhone11,2':'iPhone XS','iPhone11,4':'iPhone XS Max','iPhone11,8':'iPhone XR',
+'iPhone12,1':'iPhone 11','iPhone12,3':'iPhone 11 Pro','iPhone12,5':'iPhone 11 Pro Max','iPhone12,8':'iPhone SE 2',
+'iPhone13,1':'iPhone 12 mini','iPhone13,2':'iPhone 12','iPhone13,3':'iPhone 12 Pro','iPhone13,4':'iPhone 12 Pro Max',
+'iPhone14,2':'iPhone 13 Pro','iPhone14,3':'iPhone 13 Pro Max','iPhone14,4':'iPhone 13 mini','iPhone14,5':'iPhone 13','iPhone14,6':'iPhone SE 3',
+'iPhone14,7':'iPhone 14','iPhone14,8':'iPhone 14 Plus','iPhone15,2':'iPhone 14 Pro','iPhone15,3':'iPhone 14 Pro Max',
+'iPhone15,4':'iPhone 15','iPhone15,5':'iPhone 15 Plus','iPhone16,1':'iPhone 15 Pro','iPhone16,2':'iPhone 15 Pro Max',
+'iPhone17,1':'iPhone 16 Pro','iPhone17,2':'iPhone 16 Pro Max','iPhone17,3':'iPhone 16','iPhone17,4':'iPhone 16 Plus'
+};
+
+var DEV_GOOGLE={
+'Pixel':'Pixel','Pixel XL':'Pixel XL','Pixel 2':'Pixel 2','Pixel 2 XL':'Pixel 2 XL',
+'Pixel 3':'Pixel 3','Pixel 3 XL':'Pixel 3 XL','Pixel 3a':'Pixel 3a',
+'Pixel 4':'Pixel 4','Pixel 4 XL':'Pixel 4 XL','Pixel 4a':'Pixel 4a',
+'Pixel 5':'Pixel 5','Pixel 5a':'Pixel 5a','Pixel 6':'Pixel 6','Pixel 6 Pro':'Pixel 6 Pro','Pixel 6a':'Pixel 6a',
+'Pixel 7':'Pixel 7','Pixel 7 Pro':'Pixel 7 Pro','Pixel 7a':'Pixel 7a',
+'Pixel 8':'Pixel 8','Pixel 8 Pro':'Pixel 8 Pro','Pixel 8a':'Pixel 8a',
+'Pixel 9':'Pixel 9','Pixel 9 Pro':'Pixel 9 Pro'
+};
+
+var DEV_XIAOMI={
+'M2101K6G':'Redmi Note 10 Pro','M2101K7BG':'Redmi Note 10','M2101K7AG':'Redmi Note 10S',
+'2201116SG':'Redmi Note 11','2201117TG':'Redmi Note 11 Pro','2201116TG':'Redmi Note 11S',
+'2209116AG':'Redmi Note 12','23021RAAEG':'Redmi Note 12 Pro',
+'22101316G':'Xiaomi 12T','2207122MC':'Xiaomi 12','2201123G':'Xiaomi 12 Pro',
+'23078PND5G':'Xiaomi 13T','2211133G':'Xiaomi 13','2210132G':'Xiaomi 13 Pro',
+'2311DRK48C':'Xiaomi 14','23116PN5BC':'Xiaomi 14 Pro',
+'23013RK75C':'POCO X5 Pro','22101320G':'POCO F4','23049PCD8G':'POCO F5'
+};
+
+var DEV_HUAWEI={
+'ELE-L29':'P30','VOG-L29':'P30 Pro','ANA-NX9':'P40','ELS-NX9':'P40 Pro',
+'ABR-LX9':'P50 Pro','BAL-L49':'P60 Pro',
+'YAL-L21':'Mate 20 Pro','LIO-L29':'Mate 30 Pro','NOH-NX9':'Mate 40 Pro'
+};
+
+function resolveDevice(make,model){
+  if(!model)return '';
+  var mk=(make||'').toLowerCase().trim();
+  var md=String(model).trim();
+  // Samsung
+  if(mk.indexOf('samsung')>=0||md.indexOf('SM-')===0){
+    var prefix=md.substring(0,6);
+    if(DEV_SAMSUNG[prefix])return DEV_SAMSUNG[prefix];
+    prefix=md.substring(0,7);
+    if(DEV_SAMSUNG[prefix])return DEV_SAMSUNG[prefix];
+    // Try longer match
+    for(var k in DEV_SAMSUNG){if(md.indexOf(k)===0)return DEV_SAMSUNG[k];}
+  }
+  // Apple
+  if(mk.indexOf('apple')>=0||md.indexOf('iPhone')===0||md.indexOf('iPad')===0){
+    if(DEV_APPLE[md])return DEV_APPLE[md];
+    // Try partial
+    for(var k in DEV_APPLE){if(md.indexOf(k)===0)return DEV_APPLE[k];}
+  }
+  // Google
+  if(mk.indexOf('google')>=0){if(DEV_GOOGLE[md])return DEV_GOOGLE[md];}
+  // Xiaomi
+  if(mk.indexOf('xiaomi')>=0||mk.indexOf('redmi')>=0||mk.indexOf('poco')>=0){
+    if(DEV_XIAOMI[md])return DEV_XIAOMI[md];
+  }
+  // Huawei
+  if(mk.indexOf('huawei')>=0){
+    for(var k in DEV_HUAWEI){if(md.indexOf(k)>=0)return DEV_HUAWEI[k];}
+  }
+  return '';
+}
+
+/* ================================================================
+   SOCIAL NETWORK / PLATFORM DETECTION
+   ================================================================ */
+function detectSocial(R){
+  var results=[];
+  var hasExif=R.exif&&(R.exif.i0.length>2||R.exif.ie.length>0);
+  var hasGPS=R.exif&&R.exif.ig&&R.exif.ig.length>0;
+  var hasIPTC=R.iptc&&R.iptc.length>0;
+  var hasXMP=!!R.xmp;
+  var hasMaker=R.exif&&R.exif.mn;
+  var hasICC=!!R.icc;
+  var hasCom=R.coms.length>0;
+  var sw='';
+  if(R.exif)for(var i=0;i<R.exif.i0.length;i++){if(R.exif.i0[i].id===0x0131)sw=String(R.exif.i0[i].v).toLowerCase();}
+  var comText='';
+  for(var i=0;i<R.coms.length;i++)comText+=String(R.coms[i].t).toLowerCase();
+
+  // Quantization table signatures
+  var qt0=R.qt.length>0?R.qt[0].v:null;
+  var qt0sum=0,qt1sum=0;
+  if(R.qt.length>0)qt0sum=R.qt[0].v.reduce(function(a,b){return a+b;},0);
+  if(R.qt.length>1)qt1sum=R.qt[1].v.reduce(function(a,b){return a+b;},0);
+  var qtFirst=qt0?qt0[0]:0;
+  var qtDC=qt0?qt0[0]:0;
+  var noExifAtAll=!hasExif&&!hasGPS&&!hasIPTC&&!hasXMP&&!hasMaker;
+
+  // Facebook / Meta
+  if(noExifAtAll&&!hasICC&&R.jfif){
+    if(qtDC>=2&&qtDC<=4&&qt0sum>400&&qt0sum<2500){
+      results.push({platform:'Facebook / Meta',confidence:'high',details:['EXIF completement stripe','Pas de profil ICC','Tables QT compatibles avec le pipeline FB (q=71-85)','Signature JFIF standard sans metadata']});
+    }
+  }
+
+  // Instagram
+  if(noExifAtAll&&!hasICC&&R.jfif){
+    if(R.frm&&(R.frm.w===1080||R.frm.h===1080||R.frm.w===1440||R.frm.w===1350)){
+      results.push({platform:'Instagram (Meta)',confidence:'high',details:['EXIF stripe, pas de ICC','Dimensions typiques IG: '+R.frm.w+'x'+R.frm.h,'Redimensionnement a 1080px largeur standard','Pipeline de compression Meta']});
+    }
+  }
+
+  // Twitter / X
+  if(noExifAtAll&&!hasICC){
+    var comHasTwitter=comText.indexOf('icc')>=0||comText.indexOf('twitter')>=0;
+    if(R.frm&&R.frm.w<=4096&&R.frm.h<=4096){
+      if(qt0&&qtDC>=2&&qtDC<=8&&!R.jfif){
+        results.push({platform:'Twitter / X',confidence:'med',details:['EXIF completement stripe','Pas de header JFIF (Twitter utilise souvent Mozjpeg/libjpeg-turbo)','Dimensions <=4096px (limite Twitter)','Recompression agressive']});
+      }
+    }
+  }
+
+  // WhatsApp
+  if(noExifAtAll&&!hasICC){
+    if(R.frm&&(R.frm.w<=1600&&R.frm.h<=1600)){
+      var whatsappQ=qt0sum>3000;
+      if(whatsappQ){
+        results.push({platform:'WhatsApp',confidence:'med',details:['EXIF stripe','Forte compression (QT sum='+qt0sum+')','Redimensionnement <=1600px','WhatsApp compresse agressivement les images']});
+      }
+    }
+  }
+
+  // Signal
+  if(noExifAtAll&&!hasICC&&!hasCom){
+    if(R.segs.length<=6){
+      results.push({platform:'Signal',confidence:'low',details:['Aucune metadata','Structure minimale ('+R.segs.length+' segments)','Signal strip tout par design (vie privee)']});
+    }
+  }
+
+  // Telegram (envoi comme photo)
+  if(noExifAtAll&&R.frm&&Math.max(R.frm.w,R.frm.h)<=2560){
+    if(qt0sum>1500&&qt0sum<4000){
+      results.push({platform:'Telegram (envoi photo)',confidence:'low',details:['EXIF stripe','Redimensionnement <=2560px','Compression moderee (QT sum='+qt0sum+')','Note: Telegram en mode "fichier" conserve les metadata']});
+    }
+  }
+
+  // Discord
+  if(noExifAtAll&&!hasICC){
+    results.push({platform:'Discord',confidence:'low',details:['EXIF stripe','Discord re-encode les images uploadees','Pas de signature specifique identifiable']});
+  }
+
+  // Snapchat
+  if(noExifAtAll&&R.frm&&(R.frm.w===1080||R.frm.w===720||R.frm.h===1920||R.frm.h===1280)){
+    results.push({platform:'Snapchat',confidence:'low',details:['EXIF stripe','Dimensions mobile typiques: '+R.frm.w+'x'+R.frm.h]});
+  }
+
+  // Software-based detection
+  if(sw.indexOf('picasa')>=0) results.push({platform:'Google Picasa',confidence:'high',details:['Software: Picasa']});
+  if(sw.indexOf('instagram')>=0) results.push({platform:'Instagram',confidence:'high',details:['Software tag: Instagram']});
+  if(sw.indexOf('snapseed')>=0) results.push({platform:'Google Snapseed',confidence:'high',details:['Software: Snapseed']});
+  if(sw.indexOf('lightroom')>=0) results.push({platform:'Adobe Lightroom',confidence:'high',details:['Software: Lightroom']});
+  if(sw.indexOf('photoshop')>=0) results.push({platform:'Adobe Photoshop',confidence:'high',details:['Software: Photoshop']});
+  if(sw.indexOf('gimp')>=0) results.push({platform:'GIMP',confidence:'high',details:['Software: GIMP']});
+  if(sw.indexOf('windows photo')>=0) results.push({platform:'Windows Photo Editor',confidence:'high',details:['Software: Windows Photo']});
+  if(sw.indexOf('photos')>=0&&mk==='apple') results.push({platform:'Apple Photos',confidence:'high',details:['Software: Apple Photos']});
+
+  // XMP based
+  if(R.xmp){
+    var xr=R.xmp.raw.toLowerCase();
+    if(xr.indexOf('instagram')>=0) results.push({platform:'Instagram',confidence:'high',details:['Reference Instagram dans XMP']});
+    if(xr.indexOf('facebook')>=0) results.push({platform:'Facebook',confidence:'high',details:['Reference Facebook dans XMP']});
+    if(xr.indexOf('snapchat')>=0) results.push({platform:'Snapchat',confidence:'high',details:['Reference Snapchat dans XMP']});
+    if(xr.indexOf('whatsapp')>=0) results.push({platform:'WhatsApp',confidence:'high',details:['Reference WhatsApp dans XMP']});
+  }
+
+  // If EXIF is rich, it was NOT processed by a social network
+  if(hasExif&&hasMaker&&hasGPS&&results.length===0){
+    results.push({platform:'Image originale (non traitee)',confidence:'high',details:['EXIF complet avec MakerNote','Donnees GPS presentes','Pas de signe de recompression par une plateforme']});
+  }else if(hasExif&&!hasMaker&&!hasGPS&&results.length===0){
+    results.push({platform:'Partiellement nettoyee',confidence:'med',details:['EXIF present mais incomplet','MakerNote absent (possible strip partiel)','GPS absent','Possible traitement par une app ou un OS']});
+  }
+
+  // Deduplicate - keep highest confidence per platform
+  var seen={},final=[];
+  var confOrd={high:3,med:2,low:1};
+  for(var i=0;i<results.length;i++){
+    var r=results[i],k=r.platform;
+    if(!seen[k]||confOrd[r.confidence]>confOrd[seen[k].confidence]){seen[k]=r;}
+  }
+  for(var k in seen)final.push(seen[k]);
+  // Sort by confidence
+  final.sort(function(a,b){return (confOrd[b.confidence]||0)-(confOrd[a.confidence]||0);});
+  return final;
+}
+
+/* ================================================================
+   MARKERS, TAGS, DECODERS (same as v2, compacted)
+   ================================================================ */
+var MK={0xC0:'SOF0 - Baseline DCT',0xC1:'SOF1 - Extended Sequential',0xC2:'SOF2 - Progressive DCT',0xC3:'SOF3 - Lossless',0xC4:'DHT - Define Huffman Table',0xC5:'SOF5',0xC6:'SOF6',0xC7:'SOF7',0xC8:'JPG',0xC9:'SOF9 - Arithmetic',0xCA:'SOF10',0xCB:'SOF11',0xCC:'DAC',0xCD:'SOF13',0xCE:'SOF14',0xCF:'SOF15',0xD0:'RST0',0xD1:'RST1',0xD2:'RST2',0xD3:'RST3',0xD4:'RST4',0xD5:'RST5',0xD6:'RST6',0xD7:'RST7',0xD8:'SOI - Start Of Image',0xD9:'EOI - End Of Image',0xDA:'SOS - Start Of Scan',0xDB:'DQT - Define Quantization Table',0xDC:'DNL',0xDD:'DRI - Define Restart Interval',0xDE:'DHP',0xDF:'EXP',0xE0:'APP0 - JFIF',0xE1:'APP1 - EXIF/XMP',0xE2:'APP2 - ICC Profile',0xE3:'APP3',0xE4:'APP4',0xE5:'APP5',0xE6:'APP6',0xE7:'APP7',0xE8:'APP8',0xE9:'APP9',0xEA:'APP10',0xEB:'APP11',0xEC:'APP12 - Ducky',0xED:'APP13 - Photoshop/IPTC',0xEE:'APP14 - Adobe',0xEF:'APP15',0xFE:'COM - Comment',0x01:'TEM',0xF7:'SOF48 - JPEG-LS',0xF8:'LSE'};
+
+var T0={0x00FE:'NewSubfileType',0x0100:'ImageWidth',0x0101:'ImageLength',0x0102:'BitsPerSample',0x0103:'Compression',0x0106:'PhotometricInterpretation',0x010D:'DocumentName',0x010E:'ImageDescription',0x010F:'Make',0x0110:'Model',0x0111:'StripOffsets',0x0112:'Orientation',0x0115:'SamplesPerPixel',0x0116:'RowsPerStrip',0x0117:'StripByteCounts',0x011A:'XResolution',0x011B:'YResolution',0x011C:'PlanarConfiguration',0x0128:'ResolutionUnit',0x0131:'Software',0x0132:'DateTime',0x013B:'Artist',0x013C:'HostComputer',0x013E:'WhitePoint',0x013F:'PrimaryChromaticities',0x0201:'ThumbnailOffset',0x0202:'ThumbnailLength',0x0211:'YCbCrCoefficients',0x0212:'YCbCrSubSampling',0x0213:'YCbCrPositioning',0x0214:'ReferenceBlackWhite',0x02BC:'XMLPacket (XMP)',0x8298:'Copyright',0x8769:'ExifIFDPointer',0x8825:'GPSInfoIFDPointer',0x9C9B:'XPTitle',0x9C9C:'XPComment',0x9C9D:'XPAuthor',0x9C9E:'XPKeywords',0x9C9F:'XPSubject',0xA005:'InteropIFDPointer',0xC4A5:'PrintImageMatching',0xC612:'DNGVersion',0xC614:'UniqueCameraModel',0xC62F:'CameraSerialNumber',0xC630:'LensInfo',0xC6F8:'ProfileName'};
+
+var TE={0x829A:'ExposureTime',0x829D:'FNumber',0x8822:'ExposureProgram',0x8827:'ISO',0x8830:'SensitivityType',0x9000:'ExifVersion',0x9003:'DateTimeOriginal',0x9004:'DateTimeDigitized',0x9010:'OffsetTime',0x9011:'OffsetTimeOriginal',0x9101:'ComponentsConfiguration',0x9102:'CompressedBitsPerPixel',0x9201:'ShutterSpeedValue',0x9202:'ApertureValue',0x9203:'BrightnessValue',0x9204:'ExposureBiasValue',0x9205:'MaxApertureValue',0x9206:'SubjectDistance',0x9207:'MeteringMode',0x9208:'LightSource',0x9209:'Flash',0x920A:'FocalLength',0x9214:'SubjectArea',0x927C:'MakerNote',0x9286:'UserComment',0x9290:'SubSecTime',0x9291:'SubSecTimeOriginal',0xA000:'FlashpixVersion',0xA001:'ColorSpace',0xA002:'PixelXDimension',0xA003:'PixelYDimension',0xA20E:'FocalPlaneXResolution',0xA20F:'FocalPlaneYResolution',0xA210:'FocalPlaneResolutionUnit',0xA217:'SensingMethod',0xA300:'FileSource',0xA301:'SceneType',0xA401:'CustomRendered',0xA402:'ExposureMode',0xA403:'WhiteBalance',0xA404:'DigitalZoomRatio',0xA405:'FocalLengthIn35mmFilm',0xA406:'SceneCaptureType',0xA407:'GainControl',0xA408:'Contrast',0xA409:'Saturation',0xA40A:'Sharpness',0xA40C:'SubjectDistanceRange',0xA420:'ImageUniqueID',0xA430:'CameraOwnerName',0xA431:'BodySerialNumber',0xA432:'LensSpecification',0xA433:'LensMake',0xA434:'LensModel',0xA435:'LensSerialNumber',0xA460:'CompositeImage',0xA500:'Gamma'};
+
+var TG={0x0000:'GPSVersionID',0x0001:'GPSLatitudeRef',0x0002:'GPSLatitude',0x0003:'GPSLongitudeRef',0x0004:'GPSLongitude',0x0005:'GPSAltitudeRef',0x0006:'GPSAltitude',0x0007:'GPSTimeStamp',0x0008:'GPSSatellites',0x0009:'GPSStatus',0x000A:'GPSMeasureMode',0x000B:'GPSDOP',0x000C:'GPSSpeedRef',0x000D:'GPSSpeed',0x000E:'GPSTrackRef',0x000F:'GPSTrack',0x0010:'GPSImgDirectionRef',0x0011:'GPSImgDirection',0x0012:'GPSMapDatum',0x001D:'GPSDateStamp',0x001E:'GPSDifferential',0x001F:'GPSHPositioningError'};
+var TI={0x0001:'InteroperabilityIndex',0x0002:'InteroperabilityVersion',0x1001:'RelatedImageWidth',0x1002:'RelatedImageHeight'};
+
+var NI={'2:5':'ObjectName (Titre)','2:25':'Keywords','2:55':'DateCreated','2:60':'TimeCreated','2:80':'By-line (Auteur)','2:85':'By-lineTitle','2:90':'City','2:95':'Province/State','2:100':'CountryCode','2:101':'Country','2:105':'Headline','2:110':'Credit','2:115':'Source','2:116':'Copyright','2:120':'Caption','2:122':'Writer'};
+
+/* Value decoders */
+var DV={};
+DV[0x0103]={1:'Uncompressed',6:'JPEG (old)',7:'JPEG',8:'Deflate'};
+DV[0x0112]={1:'Normal',2:'Miroir H',3:'Rotation 180',4:'Miroir V',5:'Miroir H + Rot 270',6:'Rotation 90 CW',7:'Miroir H + Rot 90',8:'Rotation 270 CW'};
+DV[0x0128]={1:'Sans unite',2:'pouces',3:'cm'};
+DV[0x0213]={1:'Centre',2:'Co-site'};
+DV[0x8822]={0:'Non defini',1:'Manuel',2:'Programme normal',3:'Priorite ouverture',4:'Priorite vitesse',5:'Creatif',6:'Action',7:'Portrait',8:'Paysage'};
+DV[0x9207]={0:'Inconnu',1:'Moyenne',2:'Ponderee centrale',3:'Spot',4:'Multi-spot',5:'Matricielle',6:'Partielle',255:'Autre'};
+DV[0x9208]={0:'Inconnu',1:'Lumiere du jour',2:'Fluorescent',3:'Tungstene',4:'Flash',9:'Beau temps',10:'Nuageux',11:'Ombre',12:'Fluorescent D',13:'Fluorescent N',14:'Fluorescent W',15:'Fluorescent WW',17:'Illuminant A',21:'D65',255:'Autre'};
+DV[0xA001]={1:'sRGB',2:'Adobe RGB',0xFFFF:'Non calibre'};
+DV[0xA217]={1:'Non defini',2:'Mono-puce couleur',3:'Bi-puce',4:'Tri-puce',5:'Sequentiel zone',7:'Trilineaire',8:'Sequentiel lineaire'};
+DV[0xA401]={0:'Normal',1:'Custom'};DV[0xA402]={0:'Auto',1:'Manuel',2:'Bracketing'};DV[0xA403]={0:'Auto',1:'Manuel'};
+DV[0xA406]={0:'Standard',1:'Paysage',2:'Portrait',3:'Nuit'};DV[0xA407]={0:'Aucun',1:'Gain+ faible',2:'Gain+ fort',3:'Gain- faible',4:'Gain- fort'};
+DV[0xA408]={0:'Normal',1:'Doux',2:'Dur'};DV[0xA409]={0:'Normal',1:'Faible',2:'Forte'};DV[0xA40A]={0:'Normal',1:'Doux',2:'Dur'};
+DV[0xA40C]={0:'Inconnu',1:'Macro',2:'Rapproche',3:'Lointain'};
+
+function decFlash(v){if(typeof v!=='number')return '';var f=(v&1)?'Flash':'Pas de flash';var m='';switch((v>>3)&3){case 1:m=', force';break;case 2:m=', supprime';break;case 3:m=', auto';break;}var re=(v&0x40)?', anti-yeux-rouges':'';return f+m+re;}
+function decVer(v){if(typeof v!=='string')return '';var c=v.replace(/0x/g,'').replace(/ /g,''),o='';for(var i=0;i<c.length;i+=2){var ch=parseInt(c.substr(i,2),16);if(ch>=32&&ch<127)o+=String.fromCharCode(ch);}if(o.length>=4)return o.substring(0,2)+'.'+o.substring(2);return o;}
+function decGPS(val,ref){if(!val||!Array.isArray(val)||val.length<3)return '';var d=val[0],m=val[1],s=val[2];return d+'\u00B0'+m+"'"+s.toFixed(2)+'"'+ref+' ('+(d+m/60+s/3600).toFixed(6)+'\u00B0)';}
+function decVal(tid,rv,ifd,all){
+  if(tid===0x9209)return decFlash(rv);if(tid===0x9000||tid===0xA000)return decVer(rv);
+  if(tid===0xA300)return rv===3||rv==='0x03'?'Appareil photo numerique':'';
+  if(tid===0xA301)return rv===1||rv==='0x01'?'Photo directe':'';
+  if(tid===0x9101){var mp={0:'-',1:'Y',2:'Cb',3:'Cr',4:'R',5:'G',6:'B'};if(typeof rv==='string'){var p=rv.split(' '),o=[];for(var i=0;i<p.length;i++)o.push(mp[parseInt(p[i],16)]||'?');return o.join(' ');}return '';}
+  if(tid===0x0002&&ifd==='gps'){var ref='';if(all)for(var i=0;i<all.length;i++)if(all[i].id===0x0001)ref=all[i].v;return decGPS(rv,ref);}
+  if(tid===0x0004&&ifd==='gps'){var ref='';if(all)for(var i=0;i<all.length;i++)if(all[i].id===0x0003)ref=all[i].v;return decGPS(rv,ref);}
+  if(tid===0x0005)return rv===0?'Au-dessus mer':rv===1?'Sous mer':'';
+  if(DV[tid]){var v=typeof rv==='number'?rv:parseInt(rv);if(DV[tid][v])return DV[tid][v];}
+  return '';
+}
+
+/* Extract GPS decimal degrees */
+function extractGPSDD(gpsIFD){
+  if(!gpsIFD||!gpsIFD.length)return null;
+  var lat=null,lon=null,latR='N',lonR='W';
+  for(var i=0;i<gpsIFD.length;i++){
+    var t=gpsIFD[i];
+    if(t.id===0x0001)latR=t.v;if(t.id===0x0003)lonR=t.v;
+    if(t.id===0x0002&&Array.isArray(t.v)&&t.v.length>=3)lat=t.v[0]+t.v[1]/60+t.v[2]/3600;
+    if(t.id===0x0004&&Array.isArray(t.v)&&t.v.length>=3)lon=t.v[0]+t.v[1]/60+t.v[2]/3600;
+  }
+  if(lat===null||lon===null)return null;
+  if(latR==='S')lat=-lat;if(lonR==='W')lon=-lon;
+  return{lat:lat,lon:lon};
+}
+
+/* === UTILS === */
+var ETSZ={1:1,2:1,3:2,4:4,5:8,6:1,7:1,8:2,9:4,10:8,11:4,12:8};
+var ETNM={1:'BYTE',2:'ASCII',3:'SHORT',4:'LONG',5:'RATIONAL',6:'SBYTE',7:'UNDEFINED',8:'SSHORT',9:'SLONG',10:'SRATIONAL',11:'FLOAT',12:'DOUBLE'};
+function hx(n,p){return '0x'+n.toString(16).toUpperCase().padStart(p||2,'0');}
+function ho(n){return '0x'+n.toString(16).toUpperCase().padStart(8,'0');}
+function es(s){return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function rU16(d,o,l){return d.getUint16(o,l);}function rU32(d,o,l){return d.getUint32(o,l);}function rS32(d,o,l){return d.getInt32(o,l);}
+function rStr(d,o,n){var s='';for(var i=0;i<n;i++){var c=d.getUint8(o+i);if(!c)break;s+=String.fromCharCode(c);}return s;}
+function hDump(buf,off,len,mx){mx=mx||256;var u=new Uint8Array(buf,off,Math.min(len,mx)),L=[];for(var i=0;i<u.length;i+=16){var a=(off+i).toString(16).toUpperCase().padStart(8,'0'),h='',c='';for(var j=0;j<16;j++){if(i+j<u.length){var b=u[i+j];h+=b.toString(16).toUpperCase().padStart(2,'0')+' ';c+=(b>=32&&b<127)?String.fromCharCode(b):'.';}else h+='   ';if(j===7)h+=' ';}L.push(a+'  '+h+' |'+c+'|');}if(len>mx)L.push('...');return L.join('\n');}
+function cEnt(buf,off,len){var f=new Uint32Array(256),u=new Uint8Array(buf,off,len);for(var i=0;i<len;i++)f[u[i]]++;var h=0;for(var i=0;i<256;i++){if(!f[i])continue;var p=f[i]/len;h-=p*Math.log2(p);}return h;}
+function cChi(buf,off,len){var u=new Uint8Array(buf,off,len);if(len<100)return null;var c0=0,c1=0;for(var i=0;i<len;i++){if(u[i]&1)c1++;else c0++;}var e=len/2;return{chi2:((c0-e)*(c0-e)+(c1-e)*(c1-e))/e,c0:c0,c1:c1,n:len};}
+function cLP(buf,off,len){var u=new Uint8Array(buf,off,Math.min(len,50000));if(u.length<200)return null;var s=0,d=0;for(var i=0;i<u.length-1;i+=2){if((u[i]&1)===(u[i+1]&1))s++;else d++;}var r=s/(s+d);return{s:s,d:d,r:r,sus:Math.abs(r-0.5)<0.01};}
+
+/* === JPEG PARSER === */
+function parseJPEG(buf){
+  var dv=new DataView(buf),u8=new Uint8Array(buf),sz=buf.byteLength;
+  var R={ok:false,sz:sz,segs:[],exif:null,xmp:null,iptc:null,icc:null,jfif:null,coms:[],qt:[],ht:[],frm:null,sf:[],pe:null,ent:{},ms:[]};
+  if(sz<4||u8[0]!==0xFF||u8[1]!==0xD8){R.err='Pas un JPEG';return R;}
+  R.ok=true;R.ms.push({o:0,m:0xD8,n:MK[0xD8]});
+  var p=2,eo=-1,si=0;
+  while(p<sz-1){
+    if(u8[p]!==0xFF){var lo=p;while(p<sz-1&&u8[p]!==0xFF)p++;if(p>lo)R.sf.push({l:'warn',t:'Hors-marqueur @ '+ho(lo)+' ('+(p-lo)+' o)'});continue;}
+    while(p<sz-1&&u8[p+1]===0xFF)p++;if(p>=sz-1)break;
+    var mO=p,mb=u8[p+1];p+=2;var mN=MK[mb]||('? '+hx(mb));R.ms.push({o:mO,m:mb,n:mN});
+    if(mb===0xD8)continue;if(mb===0xD9){eo=mO;R.segs.push({i:si++,o:mO,m:hx(mb),n:'EOI',s:2});break;}
+    if(mb>=0xD0&&mb<=0xD7){R.segs.push({i:si++,o:mO,m:hx(mb),n:mN,s:2});continue;}
+    if(mb===0x01){R.segs.push({i:si++,o:mO,m:'0x01',n:mN,s:2});continue;}
+    if(p+2>sz)break;var sL=dv.getUint16(p);if(sL<2){R.sf.push({l:'alert',t:mN+' len='+sL});break;}
+    var dO=p+2,dL=sL-2,sg={i:si++,o:mO,m:hx(mb),n:mN,s:sL+2,dO:dO,dL:dL};
+    if(mb===0xE0&&dL>=5){var id=rStr(dv,dO,5);if(id.indexOf('JFIF')===0)R.jfif={ver:dv.getUint8(dO+5)+'.'+dv.getUint8(dO+6).toString().padStart(2,'0'),un:dv.getUint8(dO+7),xd:dv.getUint16(dO+8),yd:dv.getUint16(dO+10),tw:dv.getUint8(dO+12),th:dv.getUint8(dO+13)};}
+    if(mb===0xE1&&dL>=6){var id=rStr(dv,dO,6);if(id.indexOf('Exif')===0)R.exif=pExif(buf,dO+6,dL-6);else if(dL>29&&rStr(dv,dO,29).indexOf('http://ns.adobe.com/xap/1.0/')===0)R.xmp={raw:rStr(dv,dO+29,Math.min(dL-29,8000)),sz:dL-29};}
+    if(mb===0xE2&&dL>=14&&rStr(dv,dO,11)==='ICC_PROFILE')R.icc={ch:dv.getUint8(dO+12),ct:dv.getUint8(dO+13),sz:dL-14};
+    if(mb===0xED&&dL>=14&&rStr(dv,dO,13).indexOf('Photoshop 3.')===0)R.iptc=pIPTC(buf,dO+14,dL-14);
+    if(mb===0xEE&&dL>=7&&rStr(dv,dO,5)==='Adobe'){var ct=dL>=12?dv.getUint8(dO+11):-1;sg.p={t:'Adobe',ct:ct===1?'YCbCr':ct===2?'YCCK':''+ct};}
+    if(mb>=0xE3&&mb<=0xEF&&mb!==0xED&&mb!==0xEE){sg.id=rStr(dv,dO,Math.min(dL,32));if(dL>1000)R.sf.push({l:'warn',t:mN+' volumineux ('+dL+' o)'});}
+    if(mb===0xFE){var raw=new Uint8Array(buf,dO,dL),bc=0;for(var bi=0;bi<raw.length;bi++)if(raw[bi]<32&&raw[bi]!==10&&raw[bi]!==13&&raw[bi]!==9)bc++;R.coms.push({t:rStr(dv,dO,dL),s:dL,bc:bc,o:mO});if(bc)R.sf.push({l:'warn',t:'COM binaire @ '+ho(mO)});if(dL>500)R.sf.push({l:'warn',t:'COM long ('+dL+' o)'});}
+    if(mb===0xDB){var qo=dO,qe=dO+dL;while(qo<qe){var pq=(dv.getUint8(qo)>>4)&0xF,tq=dv.getUint8(qo)&0xF,vs=pq?2:1;qo++;var vl=[];for(var qi=0;qi<64;qi++){vl.push(vs===1?dv.getUint8(qo):dv.getUint16(qo));qo+=vs;}var av=vl.slice(1).reduce(function(a,b){return a+b;},0)/63;var eq;if(av<5)eq='~98-100';else if(av<15)eq='~90-97';else if(av<40)eq='~75-89';else if(av<80)eq='~50-74';else eq='<50';R.qt.push({p:pq?16:8,id:tq,v:vl,av:av.toFixed(1),eq:eq,as:vl.every(function(x){return x===vl[0];})});}}
+    if(mb===0xC4){var h2=dO,he=dO+dL;while(h2<he){var tc=(dv.getUint8(h2)>>4)&0xF,th=dv.getUint8(h2)&0xF;h2++;var ls=[],tot=0;for(var hi=0;hi<16;hi++){ls.push(dv.getUint8(h2+hi));tot+=ls[hi];}h2+=16+tot;R.ht.push({c:tc?'AC':'DC',id:th,ls:ls,tot:tot});}}
+    if(mb>=0xC0&&mb<=0xCF&&mb!==0xC4&&mb!==0xC8&&mb!==0xCC){var pr=dv.getUint8(dO),fh=dv.getUint16(dO+1),fw=dv.getUint16(dO+3),nc=dv.getUint8(dO+5),cs=[];var cn={1:'Y',2:'Cb',3:'Cr'};for(var ci=0;ci<nc;ci++){var cid=dv.getUint8(dO+6+ci*3),sf=dv.getUint8(dO+7+ci*3);cs.push({id:cid,nm:cn[cid]||('C'+cid),hS:(sf>>4)&0xF,vS:sf&0xF,qt:dv.getUint8(dO+8+ci*3)});}R.frm={ty:mN,pr:pr,w:fw,h:fh,cs:cs};}
+    if(mb===0xDA){var sd=p+sL,sp=sd;while(sp<sz-1){if(u8[sp]===0xFF&&u8[sp+1]!==0x00&&u8[sp+1]!==0xFF&&!(u8[sp+1]>=0xD0&&u8[sp+1]<=0xD7))break;sp++;}var sdl=sp-sd;sg.sd=sd;sg.sl=sdl;if(sdl>100){R.ent.s={h:cEnt(buf,sd,Math.min(sdl,100000)).toFixed(4),sz:sdl};R.ent.c=cChi(buf,sd,Math.min(sdl,100000));R.ent.p=cLP(buf,sd,Math.min(sdl,100000));}}
+    R.segs.push(sg);p+=sL;}
+  if(eo>=0&&eo+2<sz){var pl=sz-(eo+2);R.pe={o:eo+2,l:pl};if(pl>0){R.pe.e=pl>10?cEnt(buf,eo+2,Math.min(pl,100000)).toFixed(4):null;var ds='?';if(pl>=2&&u8[eo+2]===0xFF&&u8[eo+3]===0xD8)ds='JPEG!';else if(pl>=2&&rStr(dv,eo+2,2)==='PK')ds='ZIP!';else if(pl>=4&&rStr(dv,eo+2,4)==='%PDF')ds='PDF!';else if(pl>=4&&u8[eo+2]===0x89)ds='PNG!';R.pe.d=ds;R.sf.push({l:pl>1000?'alert':'warn',t:pl+' o post-EOI - '+ds});}}else if(eo<0)R.sf.push({l:'warn',t:'Pas de EOI'});
+  if(R.ent.c&&R.ent.c.chi2<3.84)R.sf.push({l:'warn',t:'LSB chi2='+R.ent.c.chi2.toFixed(2)+' uniforme'});
+  if(R.ent.p&&R.ent.p.sus)R.sf.push({l:'warn',t:'Paires LSB ~0.5'});
+  return R;
+}
+
+function pExif(buf,st,ml){var dv=new DataView(buf),R={i0:[],i1:[],ie:[],ig:[],ii:[],mn:null,th:null,w:[],bo:''};try{var bo=dv.getUint16(st),le=bo===0x4949;if(bo!==0x4949&&bo!==0x4D4D)return R;R.bo=le?'LE (Intel)':'BE (Motorola)';var i0o=rU32(dv,st+4,le);
+function rIFD(off,td){var tags=[],ab=st+off;if(ab+2>st+ml)return{tags:tags,nx:0};var cnt=rU16(dv,ab,le);for(var i=0;i<cnt;i++){var eo=ab+2+i*12;if(eo+12>buf.byteLength)break;var tid=rU16(dv,eo,le),ty=rU16(dv,eo+2,le),c=rU32(dv,eo+4,le),vs=(ETSZ[ty]||1)*c,vo=eo+8;if(vs>4)vo=st+rU32(dv,eo+8,le);var val;try{if(ty===2)val=rStr(dv,vo,vs);else if(ty===3){if(c===1)val=rU16(dv,vo,le);else{val=[];for(var j=0;j<Math.min(c,20);j++)val.push(rU16(dv,vo+j*2,le));}}else if(ty===4){if(c===1)val=rU32(dv,vo,le);else{val=[];for(var j=0;j<Math.min(c,20);j++)val.push(rU32(dv,vo+j*4,le));}}else if(ty===5){if(c===1){var n=rU32(dv,vo,le),d=rU32(dv,vo+4,le);val=d?(n/d).toFixed(4)+' ('+n+'/'+d+')':n+'/0';}else{val=[];for(var j=0;j<Math.min(c,10);j++){var n2=rU32(dv,vo+j*8,le),d2=rU32(dv,vo+j*8+4,le);val.push(d2?n2/d2:n2);}}}else if(ty===10){if(c===1){var n3=rS32(dv,vo,le),d3=rS32(dv,vo+4,le);val=d3?(n3/d3).toFixed(4)+' ('+n3+'/'+d3+')':n3+'/0';}else{val=[];for(var j=0;j<Math.min(c,10);j++){var n4=rS32(dv,vo+j*8,le),d4=rS32(dv,vo+j*8+4,le);val.push(d4?n4/d4:n4);}}}else if(ty===7){if(vs<=8){val=[];for(var j=0;j<vs;j++)val.push(hx(dv.getUint8(vo+j)));val=val.join(' ');}else val='['+vs+' o]';}else if(ty===1){if(c===1)val=dv.getUint8(vo);else if(c<=8){val=[];for(var j=0;j<c;j++)val.push(dv.getUint8(vo+j));}else val='['+c+' B]';}else val='[t'+ty+' c'+c+']';}catch(e){val='[err]';}tags.push({id:tid,ih:hx(tid,4),nm:td[tid]||T0[tid]||('?_'+hx(tid,4)),ty:ETNM[ty]||('t'+ty),c:c,vs:vs,v:val,vo:vo});}var no=ab+2+cnt*12;return{tags:tags,nx:(no+4<=buf.byteLength)?rU32(dv,no,le):0};}
+var i0=rIFD(i0o,T0);R.i0=i0.tags;var ep=null;for(var i=0;i<i0.tags.length;i++)if(i0.tags[i].id===0x8769){ep=i0.tags[i];break;}
+if(ep){var ei=rIFD(typeof ep.v==='number'?ep.v:+ep.v,TE);R.ie=ei.tags;for(var i=0;i<ei.tags.length;i++){if(ei.tags[i].id===0x927C){R.mn={sz:ei.tags[i].vs,o:ei.tags[i].vo,pv:rStr(dv,ei.tags[i].vo,Math.min(ei.tags[i].vs,32))};break;}};var ip=null;for(var i=0;i<ei.tags.length;i++)if(ei.tags[i].id===0xA005){ip=ei.tags[i];break;}if(ip&&typeof ip.v==='number')R.ii=rIFD(ip.v,TI).tags;}
+var gp=null;for(var i=0;i<i0.tags.length;i++)if(i0.tags[i].id===0x8825){gp=i0.tags[i];break;}if(gp)R.ig=rIFD(typeof gp.v==='number'?gp.v:+gp.v,TG).tags;
+if(i0.nx>0){var i1=rIFD(i0.nx,T0);R.i1=i1.tags;var to=null,tl=null;for(var i=0;i<i1.tags.length;i++){if(i1.tags[i].id===0x0201)to=i1.tags[i];if(i1.tags[i].id===0x0202)tl=i1.tags[i];}if(to&&tl){var o2=typeof to.v==='number'?to.v:+to.v,l2=typeof tl.v==='number'?tl.v:+tl.v;if(o2>0&&l2>0&&st+o2+l2<=buf.byteLength)R.th={o:st+o2,s:l2,d:new Uint8Array(buf,st+o2,l2)};}}
+}catch(e){R.w.push(e.message);}return R;}
+
+function pIPTC(buf,st,ml){var dv=new DataView(buf),tags=[];try{var pos=st,end=st+ml;while(pos+12<end){var sig=rStr(dv,pos,4);if(sig!=='8BIM')break;var rid=dv.getUint16(pos+4),nl=dv.getUint8(pos+6),pn=nl+(nl%2===0?1:0)+1,dsz=dv.getUint32(pos+6+pn);if(rid===0x0404){var ip=pos+6+pn+4,ie=ip+dsz;while(ip+5<ie){if(dv.getUint8(ip)!==0x1C)break;var rc=dv.getUint8(ip+1),tg=dv.getUint8(ip+2),ln=dv.getUint16(ip+3),vl=rStr(dv,ip+5,ln),key=rc+':'+tg;tags.push({k:key,n:NI[key]||key,v:vl,s:ln});ip+=5+ln;}break;}pos+=6+pn+4+dsz+(dsz%2);}}catch(e){}return tags;}
+
+/* === UI === */
+var gB=null;
+function sS(m,c){var e=document.getElementById('status');e.textContent=m;e.className=c||'';}
+function sP(buf){var bl=new Blob([buf],{type:'image/jpeg'}),u=URL.createObjectURL(bl),im=new Image();im.onload=function(){document.getElementById('pz').style.display='block';var cv=document.getElementById('cv'),cx=cv.getContext('2d'),sc=Math.min(400/im.naturalWidth,300/im.naturalHeight,1);cv.width=Math.round(im.naturalWidth*sc);cv.height=Math.round(im.naturalHeight*sc);cx.drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);};im.onerror=function(){document.getElementById('pz').style.display='none';URL.revokeObjectURL(u);};im.src=u;}
+
+function ren(R){
+  var el=document.getElementById('results'),h='',pi=document.getElementById('pi'),ih='';
+  ih+='<div class="r"><span class="l">Fichier</span><span class="v">'+es(R._n)+'</span></div>';
+  ih+='<div class="r"><span class="l">Taille</span><span class="v">'+R.sz.toLocaleString()+' o</span></div>';
+  if(R.frm)ih+='<div class="r"><span class="l">Dimensions</span><span class="v">'+R.frm.w+'x'+R.frm.h+'</span></div>';
+
+  var mk='',md='',sw='',dt='',ow='',sn='',lm='',ln='';
+  if(R.exif){for(var i=0;i<R.exif.i0.length;i++){var t=R.exif.i0[i];if(t.id===0x010F)mk=t.v;if(t.id===0x0110)md=t.v;if(t.id===0x0131)sw=t.v;if(t.id===0x0132)dt=t.v;if(t.id===0x013B)ow=t.v;}
+  for(var i=0;i<R.exif.ie.length;i++){var t=R.exif.ie[i];if(t.id===0xA430&&!ow)ow=t.v;if(t.id===0xA431)sn=t.v;if(t.id===0xA434)lm=t.v;if(t.id===0xA433)ln=t.v;}}
+
+  // Device resolution
+  var devName=resolveDevice(mk,md);
+  if(mk)ih+='<div class="r"><span class="l">Appareil</span><span class="v">'+es(mk)+' '+es(md)+'</span></div>';
+  if(devName)ih+='<div class="r"><span class="l">Nom commercial</span><span class="v dev">'+es(devName)+'</span></div>';
+  if(ow)ih+='<div class="r"><span class="l">Proprietaire</span><span class="v">'+es(ow)+'</span></div>';
+  if(sn)ih+='<div class="r"><span class="l">S/N Boitier</span><span class="v">'+es(sn)+'</span></div>';
+  if(ln||lm)ih+='<div class="r"><span class="l">Objectif</span><span class="v">'+es(ln)+' '+es(lm)+'</span></div>';
+  if(sw)ih+='<div class="r"><span class="l">Logiciel</span><span class="v">'+es(sw)+'</span></div>';
+  if(dt)ih+='<div class="r"><span class="l">Date</span><span class="v">'+es(dt)+'</span></div>';
+
+  // Social network detection
+  var socials=detectSocial(R);
+  if(socials.length>0){
+    var topSoc=socials[0];
+    ih+='<div class="r"><span class="l">Plateforme</span><span class="v soc">'+es(topSoc.platform)+'</span></div>';
+  }
+  pi.innerHTML=ih;
+
+  // Social network detail box
+  if(socials.length>0){
+    h+='<div class="social-box"><h3>&#128269; Detection plateforme / reseau social</h3>';
+    for(var i=0;i<socials.length;i++){
+      var s=socials[i];
+      h+='<div style="margin-bottom:10px;padding:8px;background:rgba(0,0,0,.2);border-radius:4px">';
+      h+='<strong style="color:var(--social)">'+es(s.platform)+'</strong>';
+      h+='<span class="conf '+s.confidence+'">'+s.confidence.toUpperCase()+'</span>';
+      for(var j=0;j<s.details.length;j++)h+='<div class="det" style="padding-left:12px;color:var(--dim)">- '+es(s.details[j])+'</div>';
+      h+='</div>';}
+    h+='</div>';
+  }
+
+  // GPS Map
+  var gps=R.exif?extractGPSDD(R.exif.ig):null;
+  if(gps){
+    h+='<div class="map-box"><h3>&#127758; Localisation GPS</h3>';
+    h+='<iframe src="https://www.openstreetmap.org/export/embed.html?bbox='+
+      (gps.lon-0.005)+','+(gps.lat-0.003)+','+(gps.lon+0.005)+','+(gps.lat+0.003)+
+      '&layer=mapnik&marker='+gps.lat+','+gps.lon+'" loading="lazy"></iframe>';
+    h+='<div class="coords">'+gps.lat.toFixed(6)+'N, '+gps.lon.toFixed(6)+'E &mdash; ';
+    h+='<a href="https://www.openstreetmap.org/?mlat='+gps.lat+'&mlon='+gps.lon+'#map=17/'+gps.lat+'/'+gps.lon+'" target="_blank" style="color:var(--accent)">Ouvrir carte</a>';
+    h+='</div></div>';
+  }
+
+  // Stego summary
+  var nA=0,nW=0;for(var i=0;i<R.sf.length;i++){if(R.sf[i].l==='alert')nA++;if(R.sf[i].l==='warn')nW++;}
+  var sc=nA?'alert':(nW?'suspect':'clean'),sl=nA?'ALERTE STEGO':(nW?'SUSPECTS':'RAS');
+  h+='<div class="ss '+sc+'"><h3>&#x2B22; '+sl+' ('+nA+'A/'+nW+'W)</h3>';
+  if(!R.sf.length)h+='<div class="si"><span class="d g"></span> Aucune anomalie</div>';
+  for(var i=0;i<R.sf.length;i++){var f=R.sf[i];h+='<div class="si"><span class="d '+(f.l==='alert'?'r':'o')+'"></span> '+es(f.t)+'</div>';}h+='</div>';
+
+  // Segments
+  h+=sec('Segments',R.segs.length,null,function(){var t='<table class="t"><tr><th>#</th><th>Off</th><th>FF</th><th>Nom (norme)</th><th>Taille</th><th></th></tr>';for(var i=0;i<R.segs.length;i++){var s=R.segs[i],n='';if(s.sl)n='Scan:'+s.sl.toLocaleString()+'o';if(s.id)n='"'+es(s.id.substring(0,24))+'"';t+='<tr><td>'+s.i+'</td><td class="off">'+ho(s.o)+'</td><td class="mk">FF'+s.m.replace('0x','')+'</td><td>'+es(s.n)+'</td><td>'+s.s.toLocaleString()+'</td><td class="vl">'+n+'</td></tr>';}return t+'</table>';});
+
+  if(R.jfif){var j=R.jfif;h+=sec('JFIF','',null,function(){return kv([['Version',j.ver],['Densite',j.xd+'x'+j.yd+' '+['','DPI','DPCM'][j.un]],['Thumbnail',j.tw?j.tw+'x'+j.th:'Non']]);});}
+  if(R.exif){var ex=R.exif;
+    if(ex.i0.length)h+=sec('EXIF IFD0 - Image',ex.i0.length+' tags',null,function(){return etbl(ex.i0,'ifd0');});
+    if(ex.ie.length)h+=sec('EXIF SubIFD - Prise de vue',ex.ie.length+' tags',null,function(){return etbl(ex.ie,'exif');});
+    if(ex.ig.length)h+=sec('EXIF GPS',ex.ig.length+' tags',null,function(){return etbl(ex.ig,'gps',ex.ig);});
+    if(ex.i1.length)h+=sec('EXIF IFD1 - Thumbnail',ex.i1.length+' tags',null,function(){var s=etbl(ex.i1,'ifd1');if(ex.th){try{var b=new Blob([ex.th.d],{type:'image/jpeg'}),u=URL.createObjectURL(b);s+='<img class="tp" src="'+u+'">';}catch(e){}}return s;});
+    if(ex.ii.length)h+=sec('Interoperability',ex.ii.length+'',null,function(){return etbl(ex.ii,'interop');});
+    if(ex.mn)h+=sec('MakerNote',ex.mn.sz+' o',ex.mn.sz>10000?'warn':null,function(){return '<div>'+ex.mn.sz.toLocaleString()+' o @ '+ho(ex.mn.o)+' | "'+es(ex.mn.pv)+'"</div><div class="hd">'+hDump(gB,ex.mn.o,ex.mn.sz,512)+'</div>';});
+    if(ex.w.length)h+=sec('EXIF Warn',ex.w.length,'warn',function(){return ex.w.map(function(w){return '<div style="color:var(--warn)">'+es(w)+'</div>';}).join('');});}
+  if(R.xmp)h+=sec('XMP',R.xmp.sz+' o',null,function(){return '<pre style="white-space:pre-wrap;max-height:400px;overflow:auto;font-size:11px;color:var(--dim)">'+es(R.xmp.raw)+'</pre>';});
+  if(R.iptc&&R.iptc.length)h+=sec('IPTC',R.iptc.length+'',null,function(){var t='<table class="t"><tr><th>DS</th><th>Nom</th><th>Valeur</th></tr>';for(var i=0;i<R.iptc.length;i++){var g=R.iptc[i];t+='<tr><td class="off">'+es(g.k)+'</td><td class="mk">'+es(g.n)+'</td><td class="vl">'+es(g.v)+'</td></tr>';}return t+'</table>';});
+  if(R.icc)h+=sec('ICC Profile','',null,function(){return kv([['Chunk',R.icc.ch+'/'+R.icc.ct],['Data',R.icc.sz+' o']]);});
+  for(var ci=0;ci<R.coms.length;ci++){(function(c,ci2){h+=sec('COM #'+(ci2+1),c.s+' o',c.bc?'warn':null,function(){var s='<pre style="white-space:pre-wrap;padding:8px;background:#080a0e;border-radius:4px;max-height:200px;overflow:auto">'+es(c.t)+'</pre>';if(c.bc)s+='<div class="hd">'+hDump(gB,c.o+4,c.s)+'</div>';return s;});})(R.coms[ci],ci);}
+  if(R.qt.length)h+=sec('DQT - Quantification',R.qt.length+'',null,function(){var s='';for(var i=0;i<R.qt.length;i++){var q=R.qt[i];s+='<div style="margin-bottom:12px"><strong style="color:var(--accent)">Table #'+q.id+'</strong> '+q.p+'bit | moy:'+q.av+' | Q:'+q.eq+(q.as?' <span style="color:var(--warn)">IDENTIQUES!</span>':'');s+='<div style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px;margin-top:4px;font-size:10px">';for(var j=0;j<q.v.length;j++){var v=q.v[j],c=Math.min(255,v*2);s+='<div style="background:rgba('+c+','+Math.max(0,80-Math.floor(c/3))+','+Math.max(0,80-Math.floor(c/3))+',0.3);padding:2px;text-align:center;border-radius:2px">'+v+'</div>';}s+='</div></div>';}return s;});
+  if(R.ht.length)h+=sec('DHT - Huffman',R.ht.length+'',null,function(){var s='';for(var i=0;i<R.ht.length;i++){var t=R.ht[i];s+='<div><strong style="color:var(--accent)">'+t.c+' #'+t.id+'</strong> '+t.tot+' codes ['+t.ls.join(',')+']</div>';}return s;});
+  if(R.ent.s){h+=sec('Entropie & LSB','',null,function(){var s='',e=parseFloat(R.ent.s.h),pc=(e/8*100).toFixed(1);s+='<div>H scan: <strong>'+R.ent.s.h+'</strong> ('+pc+'%) sur '+R.ent.s.sz.toLocaleString()+' o</div><div class="eb"><div style="width:'+pc+'%;background:linear-gradient(90deg,var(--accent),var(--info))"></div><div style="width:'+(100-pc)+'%;background:var(--border)"></div></div>';if(R.ent.c){var c=R.ent.c,u=c.chi2<3.84;s+='<div>chi2 LSB: <strong style="color:'+(u?'var(--warn)':'var(--accent)')+'">'+c.chi2.toFixed(4)+'</strong> '+(u?'UNIFORME':'Normal')+'</div>';}if(R.ent.p){var p=R.ent.p;s+='<div>Paires: ratio=<strong style="color:'+(p.sus?'var(--warn)':'var(--accent)')+'">'+p.r.toFixed(4)+'</strong>'+(p.sus?' SUSPECT':'')+'</div>';}return s;});}
+  if(R.pe&&R.pe.l>0)h+=sec('Post-EOI',R.pe.l.toLocaleString()+' o',R.pe.l>1000?'alert':'warn',function(){return '<div>'+ho(R.pe.o)+' | '+R.pe.l.toLocaleString()+' o | <strong style="color:var(--warn)">'+es(R.pe.d)+'</strong></div>'+(R.pe.e?'<div>H='+R.pe.e+'</div>':'')+'<div class="hd">'+hDump(gB,R.pe.o,R.pe.l,512)+'</div>';});
+  h+=sec('Marqueurs bruts',R.ms.length,null,function(){var t='<table class="t"><tr><th>Off</th><th>FF</th><th>Nom (norme ISO/EXIF)</th></tr>';for(var i=0;i<R.ms.length;i++){var m=R.ms[i];t+='<tr><td class="off">'+ho(m.o)+'</td><td class="mk">FF'+m.m.toString(16).toUpperCase().padStart(2,'0')+'</td><td>'+es(m.n)+'</td></tr>';}return t+'</table>';});
+  el.innerHTML=h;var hds=el.querySelectorAll('.S .h');for(var i=0;i<hds.length;i++)hds[i].addEventListener('click',function(){this.parentElement.classList.toggle('open');});
+  if(nA||nW){var ss=el.querySelectorAll('.S');for(var i=0;i<ss.length;i++)if(ss[i].querySelector('.b.alert,.b.warn'))ss[i].classList.add('open');}
+}
+
+function sec(ti,inf,bg,fn){return '<div class="S"><div class="h"><h3>'+ti+'</h3>'+(inf?'<span class="b'+(bg?' '+bg:'')+'">'+inf+'</span>':'')+'</div><div class="bd">'+fn()+'</div></div>';}
+function etbl(tags,ifd,all){var t='<table class="t"><tr><th>Tag</th><th>Nom du tag</th><th>Type</th><th>Cnt</th><th>Valeur brute</th><th>Signification</th></tr>';for(var i=0;i<tags.length;i++){var g=tags[i],v=typeof g.v==='object'?JSON.stringify(g.v):String(g.v),d=decVal(g.id,g.v,ifd,all||tags);t+='<tr><td class="off">'+g.ih+'</td><td class="mk">'+es(g.nm)+'</td><td>'+g.ty+'</td><td>'+g.c+'</td><td class="vl">'+es(v.substring(0,200))+(v.length>200?'...':'')+'</td><td class="dc">'+es(d)+'</td></tr>';}return t+'</table>';}
+function kv(p){var t='<table class="t">';for(var i=0;i<p.length;i++)t+='<tr><td class="mk">'+es(p[i][0])+'</td><td class="vl">'+es(String(p[i][1]))+'</td></tr>';return t+'</table>';}
+
+document.getElementById('fi').addEventListener('change',function(){if(!this.files.length)return;var f=this.files[0];sS('Analyse '+f.name+'...','');var r=new FileReader();r.onload=function(){try{gB=r.result;sP(gB);var R=parseJPEG(gB);R._n=f.name;ren(R);sS('OK: '+R.segs.length+' segments','ok');}catch(e){sS('ERREUR: '+e.message,'err');console.error(e);}};r.onerror=function(){sS('Erreur lecture','err');};r.readAsArrayBuffer(f);});
+document.body.addEventListener('dragover',function(e){e.preventDefault();});
+document.body.addEventListener('drop',function(e){e.preventDefault();if(e.dataTransfer.files.length){var dt=new DataTransfer();dt.items.add(e.dataTransfer.files[0]);var fi=document.getElementById('fi');fi.files=dt.files;fi.dispatchEvent(new Event('change'));}});
+</script>
+</body>
+</html>
