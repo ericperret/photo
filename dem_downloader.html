@@ -1,0 +1,442 @@
+<!--
+  dem_downloader.html
+  Auteur  : Eric Perret / F1OCM-FY4AY
+  Date    : 2026-05-16
+  Version : 1.0
+  Desc    : Téléchargement de tuiles DEM depuis 3 fournisseurs
+            SRTM/NASA-Earthdata · Copernicus GLO-30/AWS · OpenTopography API
+            Nommage tuile : coin SW (convention SRTM/Copernicus)
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DEM Tile Downloader</title>
+<style>
+  :root {
+    --bg:    #111318;
+    --panel: #1c1f27;
+    --line:  #2a2d38;
+    --acc:   #3a7bd5;
+    --red:   #e05252;
+    --grn:   #3dba6f;
+    --ylw:   #d4a017;
+    --txt:   #dde1ec;
+    --dim:   #7a7e90;
+    --mono:  'Courier New', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--txt);
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 100vh;
+    padding: 28px 16px;
+  }
+
+  /* ── Header ────────────────────────────────────── */
+  header { text-align: center; margin-bottom: 28px; }
+  header h1 { font-size: 1.25rem; letter-spacing: .06em; color: var(--acc); }
+  header p  { color: var(--dim); margin-top: 4px; }
+
+  /* ── Coord inputs ───────────────────────────────── */
+  .coord-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 28px;
+  }
+  .coord-bar label { color: var(--dim); }
+  .coord-bar input[type=number] {
+    width: 72px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--txt);
+    padding: 5px 8px;
+    font-family: var(--mono);
+    font-size: 13px;
+    text-align: center;
+  }
+  .coord-bar input:focus { outline: 1px solid var(--acc); }
+  .tile-name {
+    background: var(--panel);
+    border: 1px solid var(--acc);
+    border-radius: 4px;
+    padding: 5px 14px;
+    color: var(--acc);
+    font-weight: bold;
+    letter-spacing: .05em;
+  }
+
+  /* ── Cards grid ─────────────────────────────────── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 18px;
+    max-width: 1060px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  /* card header */
+  .card-hd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .icon {
+    width: 34px; height: 34px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; font-weight: bold; flex-shrink: 0;
+  }
+  .card-hd h2 { font-size: .95rem; }
+  .card-hd small { color: var(--dim); font-size: .75rem; }
+  .badge {
+    margin-left: auto;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: .7rem;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+  .b-free { background: #1a3d26; color: #5dd68e; }
+  .b-auth { background: #3d2a10; color: #f0a830; }
+  .b-api  { background: #102040; color: #60b0ff; }
+
+  /* specs table */
+  .specs { width: 100%; border-collapse: collapse; }
+  .specs td { padding: 3px 0; vertical-align: top; }
+  .specs td:first-child { color: var(--dim); width: 48%; padding-right: 6px; }
+  .specs tr:not(:last-child) td { border-bottom: 1px solid var(--line); }
+
+  /* auth box */
+  .auth-box {
+    background: #0d0f15;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 9px 10px;
+    font-size: .8rem;
+    line-height: 1.7;
+  }
+  .auth-box a { color: var(--acc); text-decoration: none; }
+  .auth-box a:hover { text-decoration: underline; }
+
+  /* api key input */
+  .api-row { display: flex; gap: 6px; margin-top: 6px; }
+  .api-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--txt);
+    padding: 5px 8px;
+    font-family: var(--mono);
+    font-size: .8rem;
+  }
+  .api-row input:focus { outline: 1px solid var(--acc); }
+
+  /* filename */
+  .fname {
+    background: #0d0f15;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: .72rem;
+    color: var(--dim);
+    word-break: break-all;
+  }
+  .fname span { color: var(--txt); }
+
+  /* buttons */
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 9px 0;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: .82rem;
+    font-weight: bold;
+    text-align: center;
+    text-decoration: none;
+    transition: filter .15s;
+  }
+  .btn:hover { filter: brightness(1.15); }
+  .btn-login { background: var(--ylw); color: #111; margin-bottom: 4px; }
+  .btn-dl    { background: var(--grn); color: #fff; }
+  .btn-warn  { background: var(--red); color: #fff; }
+
+  /* note */
+  .note {
+    font-size: .72rem;
+    color: var(--dim);
+    line-height: 1.5;
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+  }
+  .note strong { color: var(--ylw); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⛰ DEM Tile Downloader</h1>
+  <p>Tuile 1°×1° — coin SW de la tuile (convention SRTM / Copernicus)</p>
+</header>
+
+<!-- ── Coordonnées ───────────────────────────────────── -->
+<div class="coord-bar">
+  <label>Lat (N) :</label>
+  <input type="number" id="inLat" value="45" min="-90" max="89" step="1" oninput="refresh()">
+  <label>Lon (E) :</label>
+  <input type="number" id="inLon" value="6"  min="-180" max="179" step="1" oninput="refresh()">
+  <div class="tile-name" id="tileName">N45E006</div>
+</div>
+
+<!-- ── Cards ────────────────────────────────────────── -->
+<div class="grid">
+
+  <!-- ══ CARD 1 — SRTM NASA/USGS ══ -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="icon" style="background:#3e2000;color:#f0a830">S</div>
+      <div>
+        <h2>SRTM GL1 v3</h2>
+        <small>NASA · USGS LP DAAC</small>
+      </div>
+      <span class="badge b-auth">🔑 Auth</span>
+    </div>
+
+    <table class="specs">
+      <tr><td>Conteneur</td><td>HGT.zip → lisible GDAL</td></tr>
+      <tr><td>Compression</td><td>aucune (HGT raw)</td></tr>
+      <tr><td>Type pixel</td><td>Int16</td></tr>
+      <tr><td>Taille tuile</td><td>1201 × 1201 px</td></tr>
+      <tr><td>Résolution</td><td>~30 m (1 arc-sec)</td></tr>
+      <tr><td>Tuile</td><td id="s1tile">N45E006</td></tr>
+    </table>
+
+    <div class="auth-box">
+      🔐 Compte NASA Earthdata requis<br>
+      <a href="https://urs.earthdata.nasa.gov/users/new" target="_blank">↗ Créer un compte</a>
+      &nbsp;|&nbsp;
+      <a href="https://urs.earthdata.nasa.gov/" target="_blank">↗ Se connecter</a>
+    </div>
+
+    <div class="fname">Fichier : <span id="s1fname">N45E006.SRTMGL1.hgt.zip</span></div>
+
+    <a class="btn btn-login" href="https://urs.earthdata.nasa.gov/" target="_blank">
+      🔐 Ouvrir Earthdata Login
+    </a>
+    <a class="btn btn-dl" id="s1link"
+       href="https://e4ftl01.cr.usgs.gov/MEASURES/SRTMGL1.003/2000.02.11/N45E006.SRTMGL1.hgt.zip"
+       target="_blank">
+      ⬇ Télécharger SRTM
+    </a>
+    <div class="note">
+      <strong>Note :</strong> format HGT (binary Big-Endian Int16).
+      GDAL/QGIS lisent le .hgt directement comme raster WGS84.
+      Le download redirige via OAuth → se connecter d'abord ci-dessus.
+    </div>
+  </div>
+
+  <!-- ══ CARD 2 — Copernicus DEM / AWS ══ -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="icon" style="background:#0e1f4a;color:#60b0ff">C</div>
+      <div>
+        <h2>Copernicus DEM GLO-30</h2>
+        <small>ESA · AWS Open Data (Sinergise)</small>
+      </div>
+      <span class="badge b-free">🆓 Public</span>
+    </div>
+
+    <table class="specs">
+      <tr><td>Format</td><td>Cloud Optimized GeoTIFF</td></tr>
+      <tr><td>Compression</td><td>DEFLATE + PREDICTOR=3</td></tr>
+      <tr><td>Type pixel</td><td>Float32</td></tr>
+      <tr><td>Taille tuile</td><td>3600 × 3600 px (COG)</td></tr>
+      <tr><td>Résolution</td><td>~30 m (1 arc-sec)</td></tr>
+      <tr><td>Tuile</td><td id="s2tile">N45_00_E006_00</td></tr>
+    </table>
+
+    <div class="auth-box">
+      ✅ Aucune authentification requise<br>
+      Hébergé sur AWS S3 — <code>copernicus-dem-30m</code><br>
+      <a href="https://registry.opendata.aws/copernicus-dem/" target="_blank">↗ Fiche AWS Open Data</a>
+    </div>
+
+    <div class="fname">Fichier : <span id="s2fname">Copernicus_DSM_COG_10_N45_00_E006_00_DEM.tif</span></div>
+
+    <a class="btn btn-dl" id="s2link"
+       href="https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N45_00_E006_00_DEM/Copernicus_DSM_COG_10_N45_00_E006_00_DEM.tif"
+       target="_blank">
+      ⬇ Télécharger Copernicus DEM
+    </a>
+    <div class="note">
+      <strong>Note :</strong> La compression réelle est DEFLATE (≠ LZW).
+      Taille COG = 3600×3600 px (source DGED 3601×3601 − 1 pixel bord retiré).
+      Version 2021 release.
+    </div>
+  </div>
+
+  <!-- ══ CARD 3 — OpenTopography API ══ -->
+  <div class="card">
+    <div class="card-hd">
+      <div class="icon" style="background:#0d2e1e;color:#5dd68e">O</div>
+      <div>
+        <h2>OpenTopography API</h2>
+        <small>UCSD / NSF — globaldem endpoint</small>
+      </div>
+      <span class="badge b-api">🗝 API Key</span>
+    </div>
+
+    <table class="specs">
+      <tr><td>Format sortie</td><td>GeoTIFF</td></tr>
+      <tr><td>Compression</td><td>LZW / DEFLATE (serveur)</td></tr>
+      <tr><td>Type pixel</td><td>Float32 (COP30) / Int16 (SRTM)</td></tr>
+      <tr><td>Taille sortie</td><td>Variable (bbox 1°×1°)</td></tr>
+      <tr><td>Résolution</td><td>~30 m (selon demtype)</td></tr>
+      <tr><td>Emprise</td><td id="s3bbox">S=45 N=46 W=6 E=7</td></tr>
+    </table>
+
+    <div class="auth-box">
+      🗝 Clé API gratuite (compte requis)<br>
+      <a href="https://portal.opentopography.org/requestApiKey" target="_blank">↗ Demander une clé API</a>
+      <div class="api-row">
+        <input type="text" id="otKey" placeholder="Clé API OpenTopography…">
+      </div>
+      <br>
+      DEM type :
+      <select id="demtype" style="background:var(--bg);border:1px solid var(--line);color:var(--txt);
+              border-radius:4px;padding:3px 6px;font-family:var(--mono);font-size:.8rem;margin-top:4px">
+        <option value="SRTMGL1">SRTMGL1 — SRTM 1 arc-sec (Int16)</option>
+        <option value="COP30">COP30 — Copernicus GLO-30 (Float32)</option>
+        <option value="SRTMGL3">SRTMGL3 — SRTM 3 arc-sec (Int16)</option>
+      </select>
+    </div>
+
+    <div class="fname">URL : <span id="s3url" style="color:#60b0ff;font-size:.68rem">
+      (entrer clé API)
+    </span></div>
+
+    <button class="btn btn-dl" onclick="dlOT()">
+      ⬇ Télécharger via OpenTopography
+    </button>
+    <div class="note">
+      <strong>Note :</strong> retourne un GeoTIFF découpé exactement sur la bbox 1°×1°.
+      Pour COP30, le serveur livre Float32 ; pour SRTMGL1, Int16.
+      Quota gratuit : 500 km² / requête sans limite de nombre.
+    </div>
+  </div>
+
+</div><!-- /grid -->
+
+<script>
+/* ─── helpers ─────────────────────────────────── */
+function pad3(n){ return String(Math.abs(n)).padStart(3,'0'); }
+function pad2(n){ return String(Math.abs(n)).padStart(2,'0'); }
+
+function tileName(lat, lon) {
+  /* SRTM/NASA convention : coin SW, ex. N45E006 */
+  const ns = lat >= 0 ? 'N' : 'S';
+  const ew = lon >= 0 ? 'E' : 'W';
+  return ns + pad2(Math.abs(lat)) + ew + pad3(Math.abs(lon));
+}
+
+function copName(lat, lon) {
+  /* Copernicus convention : N45_00_E006_00 */
+  const ns = lat >= 0 ? 'N' : 'S';
+  const ew = lon >= 0 ? 'E' : 'W';
+  return ns + pad2(Math.abs(lat)) + '_00_' + ew + pad3(Math.abs(lon)) + '_00';
+}
+
+/* ─── refresh all dynamic fields ─────────────── */
+function refresh() {
+  const lat = parseInt(document.getElementById('inLat').value) || 0;
+  const lon = parseInt(document.getElementById('inLon').value) || 0;
+
+  const tn  = tileName(lat, lon);
+  const cn  = copName(lat, lon);
+
+  /* header */
+  document.getElementById('tileName').textContent = tn;
+
+  /* CARD 1 — SRTM */
+  const s1file = tn + '.SRTMGL1.hgt.zip';
+  const s1url  = 'https://e4ftl01.cr.usgs.gov/MEASURES/SRTMGL1.003/2000.02.11/' + s1file;
+  document.getElementById('s1tile').textContent  = tn;
+  document.getElementById('s1fname').textContent = s1file;
+  document.getElementById('s1link').href         = s1url;
+
+  /* CARD 2 — Copernicus */
+  const s2dir  = 'Copernicus_DSM_COG_10_' + cn + '_DEM';
+  const s2file = s2dir + '.tif';
+  const s2url  = 'https://copernicus-dem-30m.s3.amazonaws.com/' + s2dir + '/' + s2file;
+  document.getElementById('s2tile').textContent  = cn;
+  document.getElementById('s2fname').textContent = s2file;
+  document.getElementById('s2link').href         = s2url;
+
+  /* CARD 3 — OpenTopography bbox */
+  const south = lat, north = lat + 1, west = lon, east = lon + 1;
+  document.getElementById('s3bbox').textContent =
+    'S=' + south + ' N=' + north + ' W=' + west + ' E=' + east;
+  updateOTUrl();
+}
+
+function updateOTUrl() {
+  const lat  = parseInt(document.getElementById('inLat').value) || 0;
+  const lon  = parseInt(document.getElementById('inLon').value) || 0;
+  const key  = document.getElementById('otKey').value.trim();
+  const dem  = document.getElementById('demtype').value;
+  const base = 'https://portal.opentopography.org/API/globaldem'
+             + '?demtype=' + dem
+             + '&south=' + lat + '&north=' + (lat+1)
+             + '&west='  + lon + '&east='  + (lon+1)
+             + '&outputFormat=GTiff';
+  document.getElementById('s3url').textContent = key
+    ? base + '&API_Key=' + key
+    : '(entrer clé API)';
+}
+
+function dlOT() {
+  const lat = parseInt(document.getElementById('inLat').value) || 0;
+  const lon = parseInt(document.getElementById('inLon').value) || 0;
+  const key = document.getElementById('otKey').value.trim();
+  if (!key) { alert('Entrez votre clé API OpenTopography.'); return; }
+  const dem = document.getElementById('demtype').value;
+  const url = 'https://portal.opentopography.org/API/globaldem'
+            + '?demtype=' + dem
+            + '&south=' + lat + '&north=' + (lat+1)
+            + '&west='  + lon + '&east='  + (lon+1)
+            + '&outputFormat=GTiff'
+            + '&API_Key=' + encodeURIComponent(key);
+  window.open(url, '_blank');
+}
+
+/* listeners */
+document.getElementById('otKey').addEventListener('input', updateOTUrl);
+document.getElementById('demtype').addEventListener('change', updateOTUrl);
+
+/* init */
+refresh();
+</script>
+</body>
+</html>

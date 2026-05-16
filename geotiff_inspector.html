@@ -1,0 +1,680 @@
+<!--
+  geotiff_inspector.html
+  Auteur  : Eric Perret / F1OCM-FY4AY
+  Date    : 2026-05-16
+  Version : 1.0
+  Desc    : Analyse la structure d'un fichier GeoTIFF/HGT sans upload
+            Lit localement les IFD TIFF + GeoKeys + tags GDAL
+            Produit un dump texte copiable pour analyse Claude
+            Support : TIFF classique, BigTIFF, COG, HGT
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>GeoTIFF Inspector</title>
+<style>
+:root {
+  --bg: #0f1117; --panel: #1a1d26; --line: #252836;
+  --acc: #4a90e2; --grn: #3dba6f; --ylw: #d4a017;
+  --red: #e05252; --txt: #dde1ec; --dim: #7a7e90;
+  --mono: 'Courier New', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--txt); font-family: var(--mono);
+       font-size: 13px; padding: 24px 16px; min-height: 100vh; }
+
+h1 { color: var(--acc); font-size: 1.1rem; margin-bottom: 4px; }
+.sub { color: var(--dim); font-size: .8rem; margin-bottom: 20px; }
+
+/* Drop zone */
+.dropzone {
+  border: 2px dashed var(--acc);
+  border-radius: 8px;
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: background .2s;
+  margin-bottom: 20px;
+}
+.dropzone.over { background: #1a2a3a; }
+.dropzone p { color: var(--dim); margin-top: 8px; font-size: .8rem; }
+#fileInput { display: none; }
+.btn-file {
+  display: inline-block;
+  background: var(--acc);
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: .85rem;
+  font-weight: bold;
+}
+
+/* Result area */
+#result { display: none; }
+
+.section { margin-bottom: 16px; }
+.section-title {
+  background: var(--line);
+  padding: 5px 10px;
+  border-left: 3px solid var(--acc);
+  font-weight: bold;
+  font-size: .8rem;
+  letter-spacing: .05em;
+  color: var(--acc);
+  margin-bottom: 1px;
+}
+
+table { width: 100%; border-collapse: collapse; background: var(--panel); }
+td { padding: 4px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td:first-child { color: var(--dim); width: 38%; white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+.val-num  { color: #7ec8e3; }
+.val-str  { color: #b8e6a0; }
+.val-warn { color: var(--ylw); }
+.val-err  { color: var(--red); }
+
+/* IFD tabs */
+.ifd-tabs { display: flex; gap: 4px; margin-bottom: -1px; flex-wrap: wrap; }
+.ifd-tab {
+  padding: 4px 12px;
+  border-radius: 4px 4px 0 0;
+  background: var(--line);
+  cursor: pointer;
+  font-size: .75rem;
+  border: 1px solid var(--line);
+  border-bottom: none;
+}
+.ifd-tab.active { background: var(--panel); border-color: var(--line); color: var(--acc); }
+.ifd-panel { display: none; }
+.ifd-panel.active { display: block; }
+
+/* tags dump */
+.tag-row td:nth-child(1) { color: #888; width: 16%; font-size: .75rem; }
+.tag-row td:nth-child(2) { color: var(--acc); width: 30%; }
+.tag-row td:nth-child(3) { color: #aaa; width: 12%; }
+.tag-row td:nth-child(4) { width: 42%; word-break: break-all; }
+
+/* copy button */
+.btn-copy {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: var(--grn);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: .85rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 16px;
+}
+.btn-copy:hover { filter: brightness(1.1); }
+#copyMsg { text-align: center; color: var(--grn); font-size: .8rem;
+           height: 20px; margin-top: 4px; }
+
+/* raw dump textarea */
+#rawDump {
+  width: 100%; height: 220px;
+  background: #0a0c12; color: var(--dim);
+  border: 1px solid var(--line); border-radius: 4px;
+  padding: 8px; font-family: var(--mono); font-size: .72rem;
+  resize: vertical; margin-top: 4px;
+}
+.progress { color: var(--ylw); padding: 10px; }
+</style>
+</head>
+<body>
+
+<h1>⬡ GeoTIFF / HGT Inspector</h1>
+<p class="sub">Analyse locale — aucun upload — lit uniquement les IFD et GeoKeys</p>
+
+<div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+  <label class="btn-file">📂 Choisir un fichier</label>
+  <p>ou glisser-déposer .tif / .tiff / .hgt ici</p>
+  <p id="dropMsg"></p>
+</div>
+<input type="file" id="fileInput" accept=".tif,.tiff,.hgt,.zip">
+
+<div id="result">
+  <div id="resultContent"></div>
+  <button class="btn-copy" onclick="copyDump()">📋 Copier le dump — coller dans Claude</button>
+  <div id="copyMsg"></div>
+  <div class="section" style="margin-top:12px">
+    <div class="section-title">DUMP TEXTE BRUT</div>
+    <textarea id="rawDump" readonly></textarea>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════
+   CONSTANTES TIFF / GeoTIFF
+══════════════════════════════════════════════════ */
+const TAG_NAMES = {
+  254:'NewSubfileType', 255:'SubfileType', 256:'ImageWidth', 257:'ImageLength',
+  258:'BitsPerSample', 259:'Compression', 262:'PhotometricInterp',
+  263:'Threshholding', 264:'CellWidth', 265:'CellLength', 266:'FillOrder',
+  270:'ImageDescription', 271:'Make', 272:'Model', 273:'StripOffsets',
+  274:'Orientation', 277:'SamplesPerPixel', 278:'RowsPerStrip',
+  279:'StripByteCounts', 280:'MinSampleValue', 281:'MaxSampleValue',
+  282:'XResolution', 283:'YResolution', 284:'PlanarConfiguration',
+  296:'ResolutionUnit', 305:'Software', 306:'DateTime', 315:'Artist',
+  317:'Predictor', 318:'WhitePoint', 320:'ColorMap',
+  322:'TileWidth', 323:'TileLength', 324:'TileOffsets', 325:'TileByteCounts',
+  330:'SubIFDs', 338:'ExtraSamples', 339:'SampleFormat',
+  340:'SMinSampleValue', 341:'SMaxSampleValue',
+  33550:'ModelPixelScaleTag', 33922:'ModelTiepointTag',
+  34264:'ModelTransformationTag', 34735:'GeoKeyDirectoryTag',
+  34736:'GeoDoubleParamsTag', 34737:'GeoAsciiParamsTag',
+  42112:'GDAL_METADATA', 42113:'GDAL_NODATA',
+  50674:'LERC', 65000:'RPCCoefficientTag'
+};
+
+const COMPRESSION_NAMES = {
+  1:'None (raw)', 2:'CCITT RLE', 3:'CCITT T4', 4:'CCITT T6',
+  5:'LZW', 6:'JPEG (old)', 7:'JPEG', 8:'DEFLATE/ZIP (pkzip)',
+  9:'JBIG B&W', 10:'JBIG color', 32766:'NeXT RLE', 32771:'CCITT RLEW',
+  32773:'PackBits', 32809:'Thunderscan', 32895:'IT8CTPAD',
+  32896:'IT8LW', 32897:'IT8MP', 32898:'IT8BL', 32908:'PixarFilm',
+  32909:'PixarLog', 32946:'DEFLATE (adobe)', 32947:'DCS',
+  34661:'JBIG', 34676:'SGILOG', 34677:'SGILOG24', 34712:'JP2000',
+  34887:'LERC', 34925:'LZMA2', 50000:'ZSTD', 50001:'WEBP',
+  50002:'JXL'
+};
+
+const SAMPLE_FORMAT_NAMES = {1:'UInt',2:'Int (signed)',3:'IEEE Float',4:'Undefined'};
+const PLANAR_NAMES = {1:'Chunky (interleaved)',2:'Planar (separate planes)'};
+const PREDICTOR_NAMES = {1:'None',2:'Horizontal differencing',3:'Floating point (IEEE)'};
+const PHOTOM_NAMES = {0:'MinIsWhite',1:'MinIsBlack',2:'RGB',3:'Palette',
+                      4:'Mask',5:'CMYK',6:'YCbCr',8:'CIELab'};
+const ORIENTATION_NAMES = {1:'TopLeft',2:'TopRight',3:'BotRight',4:'BotLeft',
+                            5:'LeftTop',6:'RightTop',7:'RightBot',8:'LeftBot'};
+
+// GeoKey IDs
+const GEOKEY_NAMES = {
+  1024:'GTModelTypeGeoKey', 1025:'GTRasterTypeGeoKey', 1026:'GTCitationGeoKey',
+  2048:'GeographicTypeGeoKey', 2049:'GeogCitationGeoKey', 2050:'GeogGeodeticDatumGeoKey',
+  2051:'GeogPrimeMeridianGeoKey', 2052:'GeogLinearUnitsGeoKey', 2053:'GeogLinearUnitSizeGeoKey',
+  2054:'GeogAngularUnitsGeoKey', 2055:'GeogAngularUnitSizeGeoKey', 2056:'GeogEllipsoidGeoKey',
+  2057:'GeogSemiMajorAxisGeoKey', 2058:'GeogSemiMinorAxisGeoKey', 2059:'GeogInvFlatteningGeoKey',
+  2060:'GeogAzimuthUnitsGeoKey', 2061:'GeogPrimeMeridianLongGeoKey',
+  3072:'ProjectedCSTypeGeoKey', 3073:'PCSCitationGeoKey', 3074:'ProjectionGeoKey',
+  3075:'ProjCoordTransGeoKey', 3076:'ProjLinearUnitsGeoKey', 3080:'ProjFalseEastingGeoKey',
+  3081:'ProjFalseNorthingGeoKey', 4096:'VerticalCSTypeGeoKey', 4097:'VerticalCitationGeoKey',
+  4098:'VerticalDatumGeoKey', 4099:'VerticalUnitsGeoKey'
+};
+const MODEL_TYPE = {1:'Projected',2:'Geographic',3:'Geocentric'};
+const RASTER_TYPE = {1:'PixelIsArea',2:'PixelIsPoint'};
+const ANGULAR_UNITS = {9101:'Radians',9102:'Degrees',9103:'ArcMinutes',9104:'ArcSeconds'};
+const LINEAR_UNITS = {9001:'Metre',9002:'Foot',9003:'US Survey Foot'};
+
+const TYPE_SIZES = [0,1,1,2,4,8,1,1,2,4,8,4,8];
+const TYPE_NAMES = ['','BYTE','ASCII','SHORT','LONG','RATIONAL',
+                    'SBYTE','UNDEFINED','SSHORT','SLONG','SRATIONAL','FLOAT','DOUBLE'];
+
+/* ══════════════════════════════════════════════════
+   UI — DROP / PICK
+══════════════════════════════════════════════════ */
+const dz = document.getElementById('dropzone');
+const fi = document.getElementById('fileInput');
+
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+fi.addEventListener('change', () => { if (fi.files[0]) handleFile(fi.files[0]); });
+
+/* ══════════════════════════════════════════════════
+   LECTURE ET PARSING
+══════════════════════════════════════════════════ */
+function handleFile(file) {
+  document.getElementById('dropMsg').textContent = '⏳ Lecture…';
+  // Lire les premiers 4 Mo (couvre IFDs + GeoKeys + SubIFDs)
+  const SLICE = Math.min(file.size, 4 * 1024 * 1024);
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('dropMsg').textContent = '';
+    try {
+      const info = parseTIFF(e.target.result, file);
+      info.fileName = file.name;
+      info.fileSize = file.size;
+      render(info);
+    } catch(ex) {
+      document.getElementById('dropMsg').textContent = '❌ Erreur : ' + ex.message;
+    }
+  };
+  reader.readAsArrayBuffer(file.slice(0, SLICE));
+}
+
+function readU16(v, off, le){ return v.getUint16(off, le); }
+function readU32(v, off, le){ return v.getUint32(off, le); }
+function readI16(v, off, le){ return v.getInt16(off, le); }
+function readI32(v, off, le){ return v.getInt32(off, le); }
+function readF32(v, off, le){ return v.getFloat32(off, le); }
+function readF64(v, off, le){ return v.getFloat64(off, le); }
+
+// Lecture valeur selon type TIFF
+function readTypedValue(v, off, type, le) {
+  switch(type){
+    case 1: return v.getUint8(off);
+    case 2: return null; // ASCII traité séparément
+    case 3: return readU16(v,off,le);
+    case 4: return readU32(v,off,le);
+    case 5: return readU32(v,off,le) + '/' + readU32(v,off+4,le);
+    case 6: return v.getInt8(off);
+    case 7: return v.getUint8(off);
+    case 8: return readI16(v,off,le);
+    case 9: return readI32(v,off,le);
+    case 10: return readI32(v,off,le) + '/' + readI32(v,off+4,le);
+    case 11: return readF32(v,off,le);
+    case 12: return readF64(v,off,le);
+    default: return null;
+  }
+}
+
+function readASCII(v, off, count) {
+  let s = '';
+  for (let i = 0; i < count; i++) {
+    const c = v.getUint8(off + i);
+    if (c === 0) break;
+    s += String.fromCharCode(c);
+  }
+  return s.trim();
+}
+
+function readValues(v, off, type, count, le) {
+  if (type === 2) return readASCII(v, off, count);
+  const vals = [];
+  const sz = TYPE_SIZES[type] || 1;
+  for (let i = 0; i < Math.min(count, 32); i++) {
+    const val = readTypedValue(v, off + i*sz, type, le);
+    if (val !== null) vals.push(val);
+  }
+  return vals;
+}
+
+/* ══════════════════════════════════════════════════
+   PARSER PRINCIPAL
+══════════════════════════════════════════════════ */
+function parseTIFF(buffer, file) {
+  const v = new DataView(buffer);
+  const info = { ifds:[], geokeys:[], gdal:{}, errors:[] };
+
+  // Byte order
+  const bo = v.getUint16(0);
+  if (bo === 0x4949)      info.endian = 'Little-Endian (Intel, II)';
+  else if (bo === 0x4D4D) info.endian = 'Big-Endian (Motorola, MM)';
+  else throw new Error('Signature TIFF invalide : 0x' + bo.toString(16));
+  const le = (bo === 0x4949);
+
+  // Magic
+  const magic = readU16(v, 2, le);
+  if (magic === 42) {
+    info.format = 'TIFF classique (magic=42)';
+    info.bigtiff = false;
+  } else if (magic === 43) {
+    info.format = 'BigTIFF (magic=43)';
+    info.bigtiff = true;
+    // BigTIFF: offset size = 8, constant = 8, premier IFD offset à +8
+    const offSize = readU16(v, 4, le);
+    const const8  = readU16(v, 6, le);
+    info.btOffSize = offSize;
+  } else {
+    throw new Error('Magic TIFF inconnu : ' + magic);
+  }
+
+  // Helper pour lire un offset (4 ou 8 octets)
+  const readOff = info.bigtiff
+    ? (off) => { const lo = readU32(v, off, le); return lo; } // on ignore les 4 octets hauts
+    : (off) => readU32(v, off, le);
+  const OFF_SZ = info.bigtiff ? 8 : 4;
+
+  // Premier IFD offset
+  let ifdOff = info.bigtiff ? readOff(8) : readOff(4);
+
+  // Boucle IFDs
+  let ifdIdx = 0;
+  const seen = new Set();
+  while (ifdOff !== 0 && ifdOff < buffer.byteLength - 2 && !seen.has(ifdOff) && ifdIdx < 20) {
+    seen.add(ifdOff);
+    const ifd = parseIFD(v, buffer, ifdOff, le, info.bigtiff, readOff, OFF_SZ);
+    ifd.index = ifdIdx;
+    info.ifds.push(ifd);
+
+    // GeoKeys sur l'IFD principal
+    if (ifdIdx === 0 && ifd.tags[34735]) {
+      info.geokeys = parseGeoKeys(v, buffer, ifd, le);
+    }
+    if (ifdIdx === 0 && ifd.tags[42113]) {
+      info.gdal.nodata = ifd.tags[42113].value;
+    }
+    if (ifdIdx === 0 && ifd.tags[42112]) {
+      info.gdal.metadata = ifd.tags[42112].value
+        ? ifd.tags[42112].value.substring(0, 200)
+        : '(présent)';
+    }
+
+    // IFD suivant
+    const nTags = info.bigtiff ? readU32(v, ifdOff, le) : readU16(v, ifdOff, le);
+    const entrySz = info.bigtiff ? 20 : 12;
+    const nextOff = ifdOff + (info.bigtiff ? 8 : 2) + nTags * entrySz;
+    ifdOff = nextOff < buffer.byteLength ? readOff(nextOff) : 0;
+    ifdIdx++;
+  }
+
+  // HGT fallback
+  if (info.ifds.length === 0 && (file.name.toLowerCase().endsWith('.hgt') ||
+      file.name.toLowerCase().includes('hgt'))) {
+    info.format = 'HGT (SRTM raw binary) — pas un TIFF';
+    const px = Math.sqrt(file.size / 2);
+    info.hgt = { size: Math.round(px) + ' × ' + Math.round(px),
+                 type: 'Int16 Big-Endian', byte: file.size };
+  }
+
+  return info;
+}
+
+function parseIFD(v, buffer, off, le, bigtiff, readOff, OFF_SZ) {
+  const ifd = { tags:{}, summary:{} };
+  let cursor = off;
+
+  const nTags = bigtiff ? readU32(v, cursor, le) : readU16(v, cursor, le);
+  cursor += bigtiff ? 8 : 2;
+  const entrySz = bigtiff ? 20 : 12;
+
+  for (let i = 0; i < nTags && i < 200; i++) {
+    const entOff = cursor + i * entrySz;
+    if (entOff + entrySz > buffer.byteLength) break;
+
+    const tagId = readU16(v, entOff, le);
+    const type  = readU16(v, entOff + 2, le);
+    const count = bigtiff ? readU32(v, entOff + 4, le) : readU32(v, entOff + 4, le);
+    const valOrOff = bigtiff ? entOff + 12 : entOff + 8;
+
+    const sz = (TYPE_SIZES[type] || 1) * count;
+    let dataOff;
+    const inlineMax = OFF_SZ;
+    if (sz <= inlineMax) {
+      dataOff = valOrOff;
+    } else {
+      dataOff = readOff(valOrOff);
+    }
+
+    let value = null;
+    if (dataOff + sz <= buffer.byteLength) {
+      value = readValues(v, dataOff, type, count, le);
+      if (Array.isArray(value) && value.length === 1) value = value[0];
+    } else if (sz <= inlineMax) {
+      value = readValues(v, valOrOff, type, count, le);
+      if (Array.isArray(value) && value.length === 1) value = value[0];
+    } else {
+      value = '(offset=' + dataOff + ' hors buffer)';
+    }
+
+    ifd.tags[tagId] = { type, count, value,
+      typeName: TYPE_NAMES[type] || ('T'+type),
+      tagName: TAG_NAMES[tagId] || ('Tag_'+tagId)
+    };
+  }
+
+  // Résumé pratique
+  const g = t => ifd.tags[t] ? ifd.tags[t].value : undefined;
+  const ga = t => { const x = g(t); return Array.isArray(x) ? x : (x !== undefined ? [x] : []); };
+
+  ifd.summary.width       = g(256);
+  ifd.summary.height      = g(257);
+  ifd.summary.bps         = ga(258);
+  ifd.summary.compression = g(259);
+  ifd.summary.photometric = g(262);
+  ifd.summary.spp         = g(277);
+  ifd.summary.sampleFmt   = ga(339);
+  ifd.summary.planar      = g(284);
+  ifd.summary.predictor   = g(317);
+  ifd.summary.tileW       = g(322);
+  ifd.summary.tileH       = g(323);
+  ifd.summary.rowsStrip   = g(278);
+  ifd.summary.nodata      = g(42113);
+  ifd.summary.software    = g(305);
+  ifd.summary.datetime    = g(306);
+
+  // ModelPixelScale & Tiepoint
+  const mps = ga(33550);
+  if (mps.length >= 3) {
+    ifd.summary.pixelScaleX = +mps[0].toFixed(10);
+    ifd.summary.pixelScaleY = +mps[1].toFixed(10);
+  }
+  const mtp = ga(33922);
+  if (mtp.length >= 6) {
+    ifd.summary.originX = +mtp[3].toFixed(8);
+    ifd.summary.originY = +mtp[4].toFixed(8);
+  }
+
+  return ifd;
+}
+
+function parseGeoKeys(v, buffer, ifd, le) {
+  const tag = ifd.tags[34735];
+  if (!tag) return [];
+
+  // GeoKeyDirectoryTag : tableau de SHORT
+  const entOff = /* on relit la valeur directement depuis les données du tag */
+    (() => {
+      // Retrouver l'offset des données SHORT
+      const vals = tag.value;
+      if (!Array.isArray(vals)) return [];
+      // vals = [KeyDirectoryVersion, KeyRevision, MinorRevision, NumberOfKeys,
+      //         keyId, TIFFTagLoc, count, valueOffset, ...]
+      if (vals.length < 4) return [];
+      const nKeys = vals[3];
+      const keys = [];
+      for (let i = 0; i < nKeys; i++) {
+        const base = 4 + i * 4;
+        if (base + 3 >= vals.length) break;
+        const keyId    = vals[base];
+        const tiffTag  = vals[base+1];
+        const count    = vals[base+2];
+        const valOff   = vals[base+3];
+        let value;
+        if (tiffTag === 0) {
+          // valeur SHORT inline
+          value = valOff;
+        } else if (tiffTag === 34737 && ifd.tags[34737]) {
+          // ASCII
+          const ascii = ifd.tags[34737].value || '';
+          value = typeof ascii === 'string'
+            ? ascii.substring(valOff, valOff + count).replace(/\|/g,'').trim()
+            : '?';
+        } else if (tiffTag === 34736 && ifd.tags[34736]) {
+          // DOUBLE
+          const doubles = ifd.tags[34736].value;
+          value = Array.isArray(doubles) ? doubles[valOff] : doubles;
+        } else {
+          value = '(tiffTag=' + tiffTag + ' offset=' + valOff + ')';
+        }
+        keys.push({ keyId, name: GEOKEY_NAMES[keyId] || ('GeoKey_'+keyId), count, tiffTag, value });
+      }
+      return keys;
+    })();
+  return entOff;
+}
+
+/* ══════════════════════════════════════════════════
+   RENDU HTML
+══════════════════════════════════════════════════ */
+let lastDump = '';
+
+function render(info) {
+  const lines = [];
+  const html  = [];
+
+  const row = (k, v, cls='') =>
+    `<tr><td>${k}</td><td class="${cls}">${v}</td></tr>`;
+  const push = s => lines.push(s);
+
+  /* ── Fichier ── */
+  push('=== GEOTIFF INSPECTOR ===');
+  push('Fichier  : ' + info.fileName);
+  push('Taille   : ' + fmtSize(info.fileSize));
+  push('Format   : ' + info.format);
+  if (!info.bigtiff && info.format && !info.format.includes('HGT'))
+    push('Endian   : ' + info.endian);
+
+  html.push('<div class="section"><div class="section-title">FICHIER</div><table>');
+  html.push(row('Nom', info.fileName));
+  html.push(row('Taille', fmtSize(info.fileSize)));
+  html.push(row('Format TIFF', info.format || '—'));
+  if (info.hgt) {
+    html.push(row('Dimensions', info.hgt.size));
+    html.push(row('Type pixel', info.hgt.type));
+    push('Dimensions HGT : ' + info.hgt.size);
+    push('Type pixel     : ' + info.hgt.type);
+  } else {
+    html.push(row('Ordre octets', info.endian));
+    html.push(row('IFDs trouvés', info.ifds.length + (info.ifds.length > 1 ? ' (overviews COG inclus)' : '')));
+    push('IFDs     : ' + info.ifds.length);
+  }
+  html.push('</table></div>');
+
+  /* ── IFDs ── */
+  if (info.ifds.length > 0) {
+    push('');
+    push('=== IFDs ===');
+    html.push('<div class="section"><div class="section-title">IFDs / OVERVIEWS</div>');
+    html.push('<div class="ifd-tabs">');
+    info.ifds.forEach((ifd, i) => {
+      html.push(`<div class="ifd-tab${i===0?' active':''}" onclick="showIFD(${i})" id="tab${i}">`
+        + (i===0?'IFD-0 (pleine résolution)':'OVR-'+i) + '</div>');
+    });
+    html.push('</div>');
+
+    info.ifds.forEach((ifd, i) => {
+      const s = ifd.summary;
+      push((i===0?'IFD-0 (pleine res)':'OVR-'+i) + ' :');
+      push('  Dimensions   : ' + (s.width||'?') + ' × ' + (s.height||'?') + ' px');
+      push('  BitsPerSample: ' + (s.bps||'?'));
+      push('  SampleFormat : ' + (s.sampleFmt ? SAMPLE_FORMAT_NAMES[s.sampleFmt[0]] : '?'));
+      push('  Compression  : ' + fmtComp(s.compression));
+      push('  Predictor    : ' + (s.predictor ? PREDICTOR_NAMES[s.predictor]||s.predictor : '—'));
+      push('  SamplesPerPx : ' + (s.spp||'?'));
+      push('  PlanarConfig : ' + (s.planar ? PLANAR_NAMES[s.planar]||s.planar : '?'));
+      if (s.tileW)   push('  Tile size    : ' + s.tileW + ' × ' + s.tileH + ' (COG tiled)');
+      if (s.rowsStrip && !s.tileW) push('  RowsPerStrip : ' + s.rowsStrip + ' (stripped)');
+      if (s.pixelScaleX !== undefined) {
+        push('  PixelScale X : ' + s.pixelScaleX);
+        push('  PixelScale Y : ' + s.pixelScaleY);
+        push('  Origin       : (' + s.originX + ', ' + s.originY + ')');
+      }
+      if (s.nodata !== undefined) push('  NODATA       : ' + s.nodata);
+      if (s.software)  push('  Software     : ' + s.software);
+      if (s.datetime)  push('  DateTime     : ' + s.datetime);
+
+      html.push(`<div class="ifd-panel${i===0?' active':''}" id="ifd${i}"><table>`);
+      html.push(row('Dimensions', (s.width||'?')+'&nbsp;×&nbsp;'+(s.height||'?')+'&nbsp;px', 'val-num'));
+      html.push(row('BitsPerSample', (s.bps||'?'),'val-num'));
+      html.push(row('SampleFormat',
+        s.sampleFmt ? (SAMPLE_FORMAT_NAMES[s.sampleFmt[0]]||s.sampleFmt[0]) : '—'));
+      html.push(row('SamplesPerPixel', s.spp||'?','val-num'));
+      html.push(row('Compression', fmtComp(s.compression)));
+      html.push(row('Predictor', s.predictor ? (PREDICTOR_NAMES[s.predictor]||s.predictor) : '—'));
+      html.push(row('PlanarConfig', s.planar ? (PLANAR_NAMES[s.planar]||s.planar) : '—'));
+      if (s.tileW)
+        html.push(row('Tiling', s.tileW+'&nbsp;×&nbsp;'+s.tileH+'&nbsp;(COG)','val-str'));
+      if (s.rowsStrip && !s.tileW)
+        html.push(row('RowsPerStrip', s.rowsStrip + ' (stripped)'));
+      html.push(row('Photometric', s.photometric!==undefined?(PHOTOM_NAMES[s.photometric]||s.photometric):'—'));
+      if (s.pixelScaleX !== undefined) {
+        html.push(row('PixelScale X/Y', s.pixelScaleX+' / '+s.pixelScaleY,'val-num'));
+        html.push(row('Origine (TL)', s.originX+', '+s.originY,'val-num'));
+      }
+      if (s.nodata !== undefined) html.push(row('NODATA', s.nodata,'val-warn'));
+      if (s.software) html.push(row('Software', s.software));
+      if (s.datetime) html.push(row('DateTime', s.datetime));
+
+      /* Tags bruts */
+      const allTags = Object.entries(ifd.tags).sort((a,b)=>+a[0]-+b[0]);
+      html.push('</table><br><div class="section-title" style="font-size:.7rem">TOUS LES TAGS (' + allTags.length + ')</div><table>');
+      html.push('<tr style="color:var(--dim);font-size:.72rem"><td>ID</td><td>Nom</td><td>Type</td><td>Valeur</td></tr>');
+      allTags.forEach(([id, t]) => {
+        const val = Array.isArray(t.value) ? t.value.slice(0,8).join(', ')+(t.value.length>8?'…':'') : (t.value??'—');
+        html.push(`<tr class="tag-row"><td>0x${(+id).toString(16).toUpperCase().padStart(4,'0')} (${id})</td>`
+          +`<td>${t.tagName}</td><td>${t.typeName}[${t.count}]</td><td>${String(val).substring(0,120)}</td></tr>`);
+      });
+      html.push('</table></div>');
+    });
+    html.push('</div>'); // /section
+  }
+
+  /* ── GeoKeys ── */
+  if (info.geokeys && info.geokeys.length) {
+    push('');
+    push('=== GEOKEYS ===');
+    html.push('<div class="section"><div class="section-title">GEOKEYS (CRS)</div><table>');
+    info.geokeys.forEach(gk => {
+      let disp = gk.value;
+      if (gk.keyId === 1024) disp = MODEL_TYPE[disp] || disp;
+      if (gk.keyId === 1025) disp = RASTER_TYPE[disp] || disp;
+      if (gk.keyId === 2054) disp = ANGULAR_UNITS[disp] || disp;
+      if (gk.keyId === 3076) disp = LINEAR_UNITS[disp] || disp;
+      push('  ' + (gk.name || gk.keyId) + ' : ' + disp);
+      html.push(row(gk.name, String(disp).substring(0,100)));
+    });
+    html.push('</table></div>');
+  }
+
+  /* ── GDAL ── */
+  if (info.gdal.nodata !== undefined || info.gdal.metadata) {
+    push('');
+    push('=== GDAL ===');
+    html.push('<div class="section"><div class="section-title">GDAL (tags 42112/42113)</div><table>');
+    if (info.gdal.nodata !== undefined) {
+      push('  NODATA : ' + info.gdal.nodata);
+      html.push(row('GDAL_NODATA', info.gdal.nodata, 'val-warn'));
+    }
+    if (info.gdal.metadata) {
+      push('  METADATA : ' + info.gdal.metadata);
+      html.push(row('GDAL_METADATA', '<span style="font-size:.7rem;color:var(--dim)">'
+        + info.gdal.metadata.substring(0,200) + '</span>'));
+    }
+    html.push('</table></div>');
+  }
+
+  lastDump = lines.join('\n');
+  document.getElementById('rawDump').value = lastDump;
+  document.getElementById('resultContent').innerHTML = html.join('');
+  document.getElementById('result').style.display = 'block';
+}
+
+function fmtSize(n) {
+  if (n > 1048576) return (n/1048576).toFixed(1) + ' Mo';
+  if (n > 1024)    return (n/1024).toFixed(1) + ' Ko';
+  return n + ' octets';
+}
+function fmtComp(c) {
+  if (c === undefined) return '—';
+  return (COMPRESSION_NAMES[c] || 'Code '+c) + ' (' + c + ')';
+}
+
+function showIFD(i) {
+  document.querySelectorAll('.ifd-tab').forEach((t,j)=>t.classList.toggle('active',i===j));
+  document.querySelectorAll('.ifd-panel').forEach((p,j)=>p.classList.toggle('active',i===j));
+}
+
+function copyDump() {
+  navigator.clipboard.writeText(lastDump).then(() => {
+    document.getElementById('copyMsg').textContent = '✅ Copié — coller dans Claude';
+    setTimeout(() => document.getElementById('copyMsg').textContent = '', 3000);
+  }).catch(() => {
+    document.getElementById('rawDump').select();
+    document.execCommand('copy');
+    document.getElementById('copyMsg').textContent = '✅ Copié (fallback)';
+  });
+}
+</script>
+</body>
+</html>
