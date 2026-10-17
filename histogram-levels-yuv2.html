@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!--
+================================================================================
+  Nom        : histogram-levels-yuv2.html
+  Objet      : réglage des niveaux d'une photo sur la luminance Y (bornes début /
+               fin), histogrammes Y, U, V, enregistrement PNG de l'image traitée
+  Auteur     : Eric Perret
+  Version    : 2.1
+  Date       : 2026-10-17
+  Plateforme : HTML / CSS / JavaScript, fichier unique, aucune librairie
+  Historique :
+    2.0  2026-08-15  version publiée
+    2.1  2026-10-17  téléchargement fiabilisé (lien ajouté à la page, URL libérée
+                     après coup)
+================================================================================
+-->
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
@@ -154,8 +169,10 @@ document.getElementById('saveBtn').addEventListener('click', ()=>{
     const a = document.createElement('a');
     a.href = url;
     a.download = 'image_yuv_niveaux.png';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 10000);
   });
 });
 

@@ -1,48 +1,98 @@
-📸 Photo
+<!--
+  Nom      : LISEZMOI.md
+  Objet    : Présentation du dépôt photo (outils image et géodonnées dans le navigateur)
+  Auteur   : Eric Perret
+  Date     : 2026-10-17
+  Licence  : CC BY-NC 4.0
+-->
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#)
-[![Pure HTML/JS](https://img.shields.io/badge/Pure-HTML%2FJS-blue.svg)](#)
-[![Image Processing](https://img.shields.io/badge/Domain-Image%20Processing-purple.svg)](#)
+# 📸 Photo
 
-**Outil de correction de perspective et d'alignement d'images** pour prétraitement OCR et IA.
+🇬🇧 [English version: README.md](README.md)
 
-![Screenshot](screenshot.png)
+Six outils autonomes pour l'image et les géodonnées : un fichier HTML chacun, aucune librairie, aucune installation, fichiers lus sur le poste (rien n'est envoyé). Interfaces en français, sauf DEM Tile Downloader et GeoTIFF Inspector (titres en anglais, textes en français).
 
-## 🚀 Fonctionnalités
+| Outil | Lancer | Rôle |
+|---|---|---|
+| Correction de perspective | ▶️ **[perspective-correction-filtres.html](https://ericperret.github.io/photo/perspective-correction-filtres.html)** | Redresser une photo et l'enregistrer |
+| Niveaux YUV | ▶️ **[histogram-levels-yuv2.html](https://ericperret.github.io/photo/histogram-levels-yuv2.html)** | Régler les niveaux sur la luminance |
+| JPEG Forensic v3 | ▶️ **[jpeg-forensic-v3.html](https://ericperret.github.io/photo/jpeg-forensic-v3.html)** | Analyser la structure et les métadonnées d'un JPEG |
+| GeoTIFF / HGT Inspector | ▶️ **[geotiff_inspector.html](https://ericperret.github.io/photo/geotiff_inspector.html)** | Lire la structure d'un GeoTIFF ou d'un HGT |
+| DEM Tile Downloader | ▶️ **[dem_downloader.html](https://ericperret.github.io/photo/dem_downloader.html)** | Télécharger des tuiles de modèle numérique de terrain |
+| Assistant de captures | ▶️ **[captures.html](https://ericperret.github.io/photo/captures.html)** | Préparer les captures d'écran d'un organigramme |
 
-- **Correction de Perspective 4 Points** — Sélectionner les coins, redresser les documents
-- **Détection Automatique des Bords** — Détection intelligente des contours
-- **Rotation & Redressement** — Corriger les scans inclinés
-- **Recadrage & Export** — Sauvegarder les images corrigées
-- **Aperçu Temps Réel** — Voir les résultats avant application
-- **Support Tactile** — Fonctionne sur tablettes
+---
 
-## 🛠️ Technologies
+## Correction de perspective
 
-- HTML/CSS/JavaScript pur
-- Manipulation d'images basée sur Canvas
-- Transformation homographique
-- Aucune dépendance externe
+![Correction de perspective](screenshot_perspective-correction-filtres.png)
 
-## 📖 Utilisation
+| Fonction | Description |
+|---|---|
+| Géométrie | Rotations X, Y, Z, perspective, échelle, inclinaisons X et Y, en direct |
+| Filtres | Inversion (négatif), contraste |
+| Enregistrement | PNG de l'image telle qu'affichée : projection 3D (homographie) et filtres recalculés sur les pixels, interpolation bilinéaire, fond transparent hors image |
+| Réinitialiser | Retour aux réglages neutres |
 
-1. Ouvrir \`index.html\` dans un navigateur
-2. Charger une image (glisser-déposer ou sélecteur de fichier)
-3. Cliquer sur les 4 coins du document
-4. Ajuster si nécessaire
-5. Exporter l'image corrigée
+## Niveaux YUV
 
-## 🎓 Cas d'Usage
+![Niveaux YUV](screenshot_histogram-levels-yuv2.png)
 
-- **Prétraitement OCR** — Redresser les documents avant reconnaissance de texte
-- **Entrée IA** — Normaliser les images pour le machine learning
-- **Numérisation de Documents** — Corriger la perspective des photos prises au téléphone
-- **Numérisation d'Archives** — Corriger d'anciens documents scannés
+| Fonction | Description |
+|---|---|
+| Niveaux | Bornes début / fin choisies à la main sur l'histogramme de luminance Y |
+| Histogrammes | Luminance Y, chrominances U et V |
+| Enregistrement | PNG de l'image traitée |
 
-## 📄 Licence
+## JPEG Forensic v3
 
-MIT
+![JPEG Forensic v3](screenshot_jpeg-forensic-v3.png)
 
-## 👤 Auteur
+| Fonction | Description |
+|---|---|
+| Structure | Marqueurs JPEG (SOF, DHT, DQT…), dimensions, tables de quantification |
+| Métadonnées | EXIF (IFD0, Exif, IFD1 et vignette), GPS avec localisation, IPTC, XMP, MakerNote |
+| Plateforme d'origine | Détection par indices (EXIF retiré, ICC, tables de quantification, dimensions, XMP) : Facebook, Instagram, Twitter / X, WhatsApp, Telegram, Discord, Snapchat, image originale ou partiellement nettoyée, avec niveau de confiance |
 
-**Eric PERRET** — [GitHub](https://github.com/ericperret)
+## GeoTIFF / HGT Inspector
+
+![GeoTIFF / HGT Inspector](screenshot_geotiff_inspector.png)
+
+| Fonction | Description |
+|---|---|
+| Lecture | IFD TIFF, GeoKeys et tags GDAL, sans charger l'image |
+| Formats | TIFF classique, BigTIFF, COG, HGT |
+| Sortie | Dump texte copiable (pour une analyse ou une IA) |
+
+## DEM Tile Downloader
+
+![DEM Tile Downloader](screenshot_dem_downloader.png)
+
+| Fonction | Description |
+|---|---|
+| Tuile | Saisie latitude / longitude, nommage par le coin sud-ouest (convention SRTM / Copernicus) |
+| Fournisseurs | SRTM GL1 v3 (NASA Earthdata, compte requis), Copernicus DEM GLO-30 (AWS S3, libre), OpenTopography (clé API) |
+| Liens | Liens de téléchargement directs construits pour la tuile |
+
+## Assistant de captures
+
+![Assistant de captures](screenshot_captures.png)
+
+Outil d'appui à la documentation de la plateforme SEG973 (csvgen) : parcourt la liste des modules d'`organigramme.html`, attend un Ctrl+V, propose un recadrage à la souris, un format et une compression avec aperçu du poids, produit le bloc `SHOTS` à coller (`shots.js`), permet de reprendre un travail commencé et d'enregistrer chaque image.
+
+---
+
+## Historique
+
+| Outil | Version | Évolution |
+|---|---|---|
+| Correction de perspective | 1.1 | Enregistrement corrigé : l'image sauvegardée était l'original non modifié (réglages appliqués en CSS seulement) ; téléchargement fiabilisé |
+| Niveaux YUV | 2.1 | Téléchargement fiabilisé |
+
+## Licence
+
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/deed.fr) — voir [LICENSE (CC BY-NC 4.0)](<LICENSE (CC BY-NC 4.0)>).
+
+## Auteur
+
+**Eric Perret** — [GitHub](https://github.com/ericperret)
