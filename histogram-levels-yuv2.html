@@ -5,13 +5,15 @@
   Objet      : réglage des niveaux d'une photo sur la luminance Y (bornes début /
                fin), histogrammes Y, U, V, enregistrement PNG de l'image traitée
   Auteur     : Eric Perret
-  Version    : 2.1
-  Date       : 2026-10-17
+  Version    : 2.2
+  Date       : 2026-10-18
   Plateforme : HTML / CSS / JavaScript, fichier unique, aucune librairie
   Historique :
     2.0  2026-08-15  version publiée
     2.1  2026-10-17  téléchargement fiabilisé (lien ajouté à la page, URL libérée
                      après coup)
+    2.2  2026-10-18  charte graphique AZS 
+                     (palette ardoise / ambre / cyan, bandeau AZS avec lien de retour vers www.azs.fr, polices système), thème sombre
 ================================================================================
 -->
 <html lang="fr">
@@ -20,30 +22,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Niveaux YUV – Outil simple (HTML+JS pur)</title>
 <style>
-  :root { --bg:#f6f7fb; --card:#fff; --ink:#1f2937; --muted:#6b7280; --accent:#2563eb; --ok:#10b981; --warn:#f59e0b; }
+  :root { --bg:#0e1418; --card:#18222a; --card2:#141c22; --line:#26343e; --ink:#dfe7ec; --muted:#8fa1ad; --accent:#f0a63a; --cyan:#5cc8d6; --ok:#3fb950; --warn:#d29922; color-scheme:dark; }
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;background:var(--bg);color:var(--ink)}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--ink)}
   .wrap{max-width:1150px;margin:24px auto;padding:16px}
-  .card{background:var(--card);border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.06);padding:16px}
-  h1{font-size:20px;margin:0 0 12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 10px 30px -18px rgba(0,0,0,.8);padding:16px}
+  h1{font-size:20px;margin:0 0 12px;letter-spacing:-.2px}
   .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
   .controls .spacer{flex:1}
-  .btn{appearance:none;border:0;border-radius:10px;background:var(--accent);color:#fff;padding:10px 14px;cursor:pointer}
-  .btn.secondary{background:var(--ok)}
-  .btn.ghost{background:#e5e7eb;color:#111}
+  .btn{appearance:none;border:1px solid var(--accent);border-radius:6px;background:var(--accent);color:#111;padding:9px 14px;cursor:pointer;font:600 13px system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;transition:filter .15s,border-color .15s,color .15s}
+  .btn:hover{filter:brightness(1.1)}
+  .btn.secondary{background:var(--accent)}
+  .btn.ghost{background:transparent;border-color:var(--line);color:var(--ink);font-weight:500}
+  .btn.ghost:hover{filter:none;border-color:var(--accent)}
+  .btn.ghost::file-selector-button{background:var(--card2);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:4px 10px;margin-right:8px}
   .row{display:grid;grid-template-columns:1.3fr .7fr;gap:16px}
-  #imgCanvas{width:100%;height:auto;display:block;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+  #imgCanvas{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:6px;background:var(--card2)}
   .panel{display:grid;gap:12px}
-  .hist{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px}
-  .hist h3{font-size:14px;margin:0 0 8px;color:var(--muted)}
+  .hist{background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:10px}
+  .hist h3{font:600 11px ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:.06em;text-transform:uppercase;margin:0 0 8px;color:var(--muted)}
   canvas.histCanvas{width:100%;height:140px;display:block}
   .legend{font-size:12px;color:var(--muted);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .pill{padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}
-  .vals{font-size:12px;color:#111;background:#f3f4f6;border-radius:8px;padding:4px 8px}
+  .pill{padding:2px 8px;border-radius:999px;border:1px solid var(--cyan);color:var(--cyan)}
+  .vals{font:12px ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;color:var(--ink);background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:4px 8px}
   .footer{font-size:12px;color:var(--muted);margin-top:8px}
+/* ---------- charte AZS (www.azs.fr) : bandeau ---------- */
+.azs-barre{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#141c22;border-bottom:1px solid #26343e;font:600 11px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:#8fa1ad}
+.azs-barre .azs{font:800 20px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:-1px;text-transform:none;color:#f0a63a;text-decoration:none;padding-right:12px;border-right:1px solid #26343e}
+.azs-barre .azs:hover{color:#ffcf7a}
+.azs-barre a.fil{color:#8fa1ad;text-decoration:none}
+.azs-barre a.fil:hover{color:#f0a63a}
+
 </style>
 </head>
 <body>
+<nav class="azs-barre"><a class="azs" href="https://www.azs.fr/" title="www.azs.fr">AZS</a><a class="fil" href="https://github.com/ericperret/photo">photo</a></nav>
 <div class="wrap">
   <div class="card">
     <h1>Niveaux YUV – Sélection manuelle (début/fin) sur Y</h1>
@@ -63,7 +76,7 @@
           <canvas id="yHist" class="histCanvas" width="512" height="140"></canvas>
           <div class="legend">
             <span class="pill">Cliquer & glisser pour régler le début/fin</span>
-            <span>• Glisser les poignées bleues • Double‑clic pour réinitialiser</span>
+            <span>• Glisser les poignées ambre • Double‑clic pour réinitialiser</span>
           </div>
         </div>
         <div class="hist">
@@ -200,10 +213,10 @@ function drawSingleHistogram(ctx, hist, color){
   const W = ctx.canvas.width, H = ctx.canvas.height;
   ctx.clearRect(0,0,W,H);
   // fond
-  ctx.fillStyle = '#f8fafc';
+  ctx.fillStyle = '#141c22';
   ctx.fillRect(0,0,W,H);
   // lignes guides
-  ctx.strokeStyle = '#e5e7eb';
+  ctx.strokeStyle = '#26343e';
   ctx.beginPath();
   for(let i=0;i<=4;i++){
     const y = (H-10) * i/4 + 5;
@@ -221,10 +234,10 @@ function drawSingleHistogram(ctx, hist, color){
 }
 
 function drawHistograms(){
-  drawSingleHistogram(yCtx, yHist, '#3b82f6');
+  drawSingleHistogram(yCtx, yHist, '#5cc8d6');
   drawYHandles(); // superposer poignées sur Y
-  drawSingleHistogram(uCtx, uHist, '#10b981');
-  drawSingleHistogram(vCtx, vHist, '#f59e0b');
+  drawSingleHistogram(uCtx, uHist, '#3fb950');
+  drawSingleHistogram(vCtx, vHist, '#e0793a');
 }
 
 function drawYHandles(){
@@ -235,16 +248,16 @@ function drawYHandles(){
   const x2 = 5 + highY * barW;
   ctx.save();
   // zone sélectionnée
-  ctx.fillStyle = 'rgba(37,99,235,0.12)';
+  ctx.fillStyle = 'rgba(240,166,58,0.14)';
   ctx.fillRect(Math.min(x1,x2), 0, Math.abs(x2-x1), H);
   // poignées
-  ctx.strokeStyle = '#2563eb';
+  ctx.strokeStyle = '#f0a63a';
   ctx.lineWidth = 2;
   [x1,x2].forEach(x=>{
     ctx.beginPath();
     ctx.moveTo(x, 0); ctx.lineTo(x, H);
     ctx.stroke();
-    ctx.fillStyle = '#2563eb';
+    ctx.fillStyle = '#f0a63a';
     ctx.fillRect(x-4, H-14, 8, 12);
   });
   ctx.restore();

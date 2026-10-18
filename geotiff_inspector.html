@@ -1,8 +1,9 @@
 <!--
   geotiff_inspector.html
   Auteur  : Eric Perret / F1OCM-FY4AY
-  Date    : 2026-05-16
-  Version : 1.0
+  Date    : 2026-10-18
+  Version : 1.1
+  Histo.  : 1.0 2026-05-16 création ; 1.1 2026-10-18 charte graphique AZS (palette ardoise / ambre / cyan, bandeau AZS avec lien de retour vers www.azs.fr, polices système)
   Desc    : Analyse la structure d'un fichier GeoTIFF/HGT sans upload
             Lit localement les IFD TIFF + GeoKeys + tags GDAL
             Produit un dump texte copiable pour analyse 
@@ -18,39 +19,42 @@
 <title>GeoTIFF Inspector</title>
 <style>
 :root {
-  --bg: #0f1117; --panel: #1a1d26; --line: #252836;
-  --acc: #4a90e2; --grn: #3dba6f; --ylw: #d4a017;
-  --red: #e05252; --txt: #dde1ec; --dim: #7a7e90;
-  --mono: 'Courier New', monospace;
+  --bg: #0e1418; --panel: #18222a; --line: #26343e;
+  --acc: #5cc8d6; --amb: #f0a63a; --grn: #3fb950; --ylw: #d29922;
+  --red: #f85149; --txt: #dfe7ec; --dim: #8fa1ad;
+  --mono: ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--txt); font-family: var(--mono);
-       font-size: 13px; padding: 24px 16px; min-height: 100vh; }
+body { background: var(--bg); color: var(--txt); font-family: var(--sans);
+       font-size: 13px; padding: 0 16px 24px; min-height: 100vh; }
+table, #rawDump, .tag-row td { font-family: var(--mono); }
 
-h1 { color: var(--acc); font-size: 1.1rem; margin-bottom: 4px; }
+h1 { color: var(--txt); font-size: 1.3rem; letter-spacing: -.2px; margin: 24px 0 4px; }
 .sub { color: var(--dim); font-size: .8rem; margin-bottom: 20px; }
 
 /* Drop zone */
 .dropzone {
-  border: 2px dashed var(--acc);
+  border: 2px dashed var(--amb);
   border-radius: 8px;
+  background: var(--panel);
   padding: 32px;
   text-align: center;
   cursor: pointer;
   transition: background .2s;
   margin-bottom: 20px;
 }
-.dropzone.over { background: #1a2a3a; }
+.dropzone.over { background: rgba(240,166,58,.10); }
 .dropzone p { color: var(--dim); margin-top: 8px; font-size: .8rem; }
 #fileInput { display: none; }
 .btn-file {
   display: inline-block;
-  background: var(--acc);
-  color: #fff;
+  background: var(--amb);
+  color: #111;
   padding: 8px 20px;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: .85rem;
   font-weight: bold;
 }
@@ -62,11 +66,13 @@ h1 { color: var(--acc); font-size: 1.1rem; margin-bottom: 4px; }
 .section-title {
   background: var(--line);
   padding: 5px 10px;
-  border-left: 3px solid var(--acc);
+  border-left: 3px solid var(--amb);
   font-weight: bold;
-  font-size: .8rem;
-  letter-spacing: .05em;
-  color: var(--acc);
+  font-family: var(--mono);
+  font-size: .76rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--txt);
   margin-bottom: 1px;
 }
 
@@ -74,7 +80,7 @@ table { width: 100%; border-collapse: collapse; background: var(--panel); }
 td { padding: 4px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 td:first-child { color: var(--dim); width: 38%; white-space: nowrap; }
 tr:last-child td { border-bottom: none; }
-.val-num  { color: #7ec8e3; }
+.val-num  { color: var(--acc); }
 .val-str  { color: #b8e6a0; }
 .val-warn { color: var(--ylw); }
 .val-err  { color: var(--red); }
@@ -90,14 +96,14 @@ tr:last-child td { border-bottom: none; }
   border: 1px solid var(--line);
   border-bottom: none;
 }
-.ifd-tab.active { background: var(--panel); border-color: var(--line); color: var(--acc); }
+.ifd-tab.active { background: var(--panel); border-color: var(--line); color: var(--amb); }
 .ifd-panel { display: none; }
 .ifd-panel.active { display: block; }
 
 /* tags dump */
-.tag-row td:nth-child(1) { color: #888; width: 16%; font-size: .75rem; }
+.tag-row td:nth-child(1) { color: var(--dim); width: 16%; font-size: .75rem; }
 .tag-row td:nth-child(2) { color: var(--acc); width: 30%; }
-.tag-row td:nth-child(3) { color: #aaa; width: 12%; }
+.tag-row td:nth-child(3) { color: #a9b7bf; width: 12%; }
 .tag-row td:nth-child(4) { width: 42%; word-break: break-all; }
 
 /* copy button */
@@ -105,11 +111,11 @@ tr:last-child td { border-bottom: none; }
   display: block;
   width: 100%;
   padding: 10px;
-  background: var(--grn);
-  color: #fff;
+  background: var(--amb);
+  color: #111;
   border: none;
-  border-radius: 5px;
-  font-family: var(--mono);
+  border-radius: 6px;
+  font-family: var(--sans);
   font-size: .85rem;
   font-weight: bold;
   cursor: pointer;
@@ -122,15 +128,23 @@ tr:last-child td { border-bottom: none; }
 /* raw dump textarea */
 #rawDump {
   width: 100%; height: 220px;
-  background: #0a0c12; color: var(--dim);
+  background: #0b1013; color: var(--dim);
   border: 1px solid var(--line); border-radius: 4px;
   padding: 8px; font-family: var(--mono); font-size: .72rem;
   resize: vertical; margin-top: 4px;
 }
 .progress { color: var(--ylw); padding: 10px; }
+/* ---------- charte AZS (www.azs.fr) : bandeau ---------- */
+.azs-barre{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#141c22;border-bottom:1px solid #26343e;font:600 11px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:#8fa1ad;margin:0 -16px}
+.azs-barre .azs{font:800 20px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:-1px;text-transform:none;color:#f0a63a;text-decoration:none;padding-right:12px;border-right:1px solid #26343e}
+.azs-barre .azs:hover{color:#ffcf7a}
+.azs-barre a.fil{color:#8fa1ad;text-decoration:none}
+.azs-barre a.fil:hover{color:#f0a63a}
+
 </style>
 </head>
 <body>
+<nav class="azs-barre"><a class="azs" href="https://www.azs.fr/" title="www.azs.fr">AZS</a><a class="fil" href="https://github.com/ericperret/photo">photo</a></nav>
 
 <h1>⬡ GeoTIFF / HGT Inspector</h1>
 <p class="sub">Analyse locale — aucun upload — lit uniquement les IFD et GeoKeys</p>

@@ -2,7 +2,7 @@
   Name     : README.md
   Purpose  : Overview of the photo repository (image and geodata tools in the browser)
   Author   : Eric Perret
-  Date     : 2026-10-17
+  Date     : 2026-10-18
   License  : CC BY-NC 4.0
 -->
 
@@ -88,6 +88,7 @@ Support tool for documenting the SEG973 platform (csvgen): walks through the mod
 |---|---|---|
 | Perspective correction | 1.1 | Saving fixed: the saved image was the unmodified original (settings applied in CSS only); download made reliable |
 | YUV levels | 2.1 | Download made reliable |
+| All six tools | 2026-10-18 | AZS visual identity: slate / amber / cyan palette, AZS band linking back to www.azs.fr, dark theme for YUV levels and perspective correction; screenshots refreshed |
 
 ## License
 

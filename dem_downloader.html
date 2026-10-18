@@ -1,8 +1,9 @@
 <!--
   dem_downloader.html
   Auteur  : Eric Perret / F1OCM-FY4AY
-  Date    : 2026-05-16
-  Version : 1.0
+  Date    : 2026-10-18
+  Version : 1.1
+  Histo.  : 1.0 2026-05-16 création ; 1.1 2026-10-18 charte graphique AZS (palette ardoise / ambre / cyan, bandeau AZS avec lien de retour vers www.azs.fr, polices système)
   Desc    : Téléchargement de tuiles DEM depuis 3 fournisseurs
             SRTM/NASA-Earthdata · Copernicus GLO-30/AWS · OpenTopography API
             Nommage tuile : coin SW (convention SRTM/Copernicus)
@@ -15,30 +16,31 @@
 <title>DEM Tile Downloader</title>
 <style>
   :root {
-    --bg:    #111318;
-    --panel: #1c1f27;
-    --line:  #2a2d38;
-    --acc:   #3a7bd5;
-    --red:   #e05252;
-    --grn:   #3dba6f;
-    --ylw:   #d4a017;
-    --txt:   #dde1ec;
-    --dim:   #7a7e90;
-    --mono:  'Courier New', monospace;
+    --bg:    #0e1418;
+    --panel: #18222a;
+    --line:  #26343e;
+    --acc:   #5cc8d6;
+    --red:   #f85149;
+    --grn:   #3fb950;
+    --ylw:   #f0a63a;
+    --txt:   #dfe7ec;
+    --dim:   #8fa1ad;
+    --mono:  ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:  system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     background: var(--bg);
     color: var(--txt);
-    font-family: var(--mono);
+    font-family: var(--sans);
     font-size: 13px;
     min-height: 100vh;
-    padding: 28px 16px;
+    padding: 0 16px 28px;
   }
 
   /* ── Header ────────────────────────────────────── */
-  header { text-align: center; margin-bottom: 28px; }
-  header h1 { font-size: 1.25rem; letter-spacing: .06em; color: var(--acc); }
+  header { text-align: center; margin: 28px 0; }
+  header h1 { font-size: 1.4rem; letter-spacing: -.2px; color: var(--txt); }
   header p  { color: var(--dim); margin-top: 4px; }
 
   /* ── Coord inputs ───────────────────────────────── */
@@ -62,13 +64,14 @@
     font-size: 13px;
     text-align: center;
   }
-  .coord-bar input:focus { outline: 1px solid var(--acc); }
+  .coord-bar input:focus { outline: 2px solid var(--ylw); outline-offset: -1px; }
   .tile-name {
     background: var(--panel);
     border: 1px solid var(--acc);
-    border-radius: 4px;
+    border-radius: 999px;
     padding: 5px 14px;
     color: var(--acc);
+    font-family: var(--mono);
     font-weight: bold;
     letter-spacing: .05em;
   }
@@ -128,7 +131,7 @@
 
   /* auth box */
   .auth-box {
-    background: #0d0f15;
+    background: #141c22;
     border: 1px solid var(--line);
     border-radius: 5px;
     padding: 9px 10px;
@@ -150,11 +153,12 @@
     font-family: var(--mono);
     font-size: .8rem;
   }
-  .api-row input:focus { outline: 1px solid var(--acc); }
+  .api-row input:focus { outline: 2px solid var(--ylw); outline-offset: -1px; }
 
   /* filename */
   .fname {
-    background: #0d0f15;
+    font-family: var(--mono);
+    background: #141c22;
     border-radius: 4px;
     padding: 6px 8px;
     font-size: .72rem;
@@ -169,10 +173,10 @@
     width: 100%;
     padding: 9px 0;
     border: none;
-    border-radius: 5px;
+    border-radius: 6px;
     cursor: pointer;
-    font-family: var(--mono);
-    font-size: .82rem;
+    font-family: var(--sans);
+    font-size: .86rem;
     font-weight: bold;
     text-align: center;
     text-decoration: none;
@@ -180,7 +184,7 @@
   }
   .btn:hover { filter: brightness(1.15); }
   .btn-login { background: var(--ylw); color: #111; margin-bottom: 4px; }
-  .btn-dl    { background: var(--grn); color: #fff; }
+  .btn-dl    { background: var(--ylw); color: #111; }
   .btn-warn  { background: var(--red); color: #fff; }
 
   /* note */
@@ -192,9 +196,17 @@
     padding-top: 8px;
   }
   .note strong { color: var(--ylw); }
+/* ---------- charte AZS (www.azs.fr) : bandeau ---------- */
+.azs-barre{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#141c22;border-bottom:1px solid #26343e;font:600 11px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:#8fa1ad;margin:0 -16px}
+.azs-barre .azs{font:800 20px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:-1px;text-transform:none;color:#f0a63a;text-decoration:none;padding-right:12px;border-right:1px solid #26343e}
+.azs-barre .azs:hover{color:#ffcf7a}
+.azs-barre a.fil{color:#8fa1ad;text-decoration:none}
+.azs-barre a.fil:hover{color:#f0a63a}
+
 </style>
 </head>
 <body>
+<nav class="azs-barre"><a class="azs" href="https://www.azs.fr/" title="www.azs.fr">AZS</a><a class="fil" href="https://github.com/ericperret/photo">photo</a></nav>
 
 <header>
   <h1>⛰ DEM Tile Downloader</h1>

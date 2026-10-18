@@ -9,9 +9,10 @@
               organigramme.html, et permet l'enregistrement image par image.
               Bouton X : le module est marque "pas de capture a rendre".
   Auteur    : Eric Perret - DGCAT / Mission Foncier / SEG973
-  Version   : 01
-  Date      : 2026-08-15
-  Techno    : HTML5 / CSS3 / JavaScript - aucun lien externe, aucune librairie
+  Version   : 02
+  Date      : 2026-10-18
+  Techno    : HTML5 / CSS3 / JavaScript - aucune ressource externe (seul lien :
+              retour vers www.azs.fr), aucune librairie
   Usage     : ouvrir dans un navigateur, capturer l'ecran (Impr.ecran / zone),
               Ctrl+V dans la page, recadrer, valider, module suivant.
               En fin de parcours : "Enregistrer shots.js" puis coller le bloc
@@ -19,6 +20,7 @@
               "Reprendre un shots.js" permet de continuer un travail commence.
   Historique:
     v01  2026-08-15  Creation.
+    v02  2026-10-18  charte graphique AZS (palette ardoise / ambre / cyan, bandeau AZS avec lien de retour vers www.azs.fr, polices système).
 ================================================================================
 -->
 <html lang="fr">
@@ -27,45 +29,46 @@
 <title>csvgen - Assistant de captures</title>
 <style>
 :root{
-  --bg:#0e1a26; --gold:#c8a84b; --champ:#2e7bbf; --muted:#5a7a96;
-  --panel:#14283a; --line:#24455f; --ok:#6fc08a; --skip:#e0793a;
+  --bg:#0e1418; --gold:#f0a63a; --champ:#5cc8d6; --muted:#8fa1ad;
+  --panel:#1e2a33; --line:#26343e; --ok:#3fb950; --skip:#e0793a;
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--bg);color:#dce8f2;
-  font-family:"Segoe UI",Tahoma,Arial,sans-serif;font-size:13px}
+html,body{margin:0;padding:0;background:var(--bg);color:#dfe7ec;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:13px}
 header{border-bottom:1px solid var(--line);padding:10px 16px;display:flex;
   gap:14px;align-items:center;flex-wrap:wrap}
-header h1{margin:0;font-size:15px;color:var(--gold);letter-spacing:.5px}
+header h1{margin:0;font-size:16px;color:#dfe7ec;letter-spacing:-.1px}
 header .sub{color:var(--muted);font-size:11px}
 .hctrl{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
-button{background:var(--panel);color:#dce8f2;border:1px solid var(--line);
-  border-radius:4px;padding:6px 12px;cursor:pointer;font-size:12px}
+button{background:var(--panel);color:#dfe7ec;border:1px solid var(--line);
+  border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px}
 button:hover{border-color:var(--gold);color:var(--gold)}
-button.pri{background:var(--gold);color:#0e1a26;border-color:var(--gold);font-weight:600}
+button.pri:hover{color:#111;filter:brightness(1.1)}
+button.pri{background:var(--gold);color:#111;border-color:var(--gold);font-weight:600}
 button.x{border-color:#5c3520;color:#e0793a}
 button:disabled{opacity:.35;cursor:default}
-input[type=text]{background:#0b1a27;border:1px solid var(--line);border-radius:4px;
-  color:#dce8f2;padding:5px 8px;font-size:12px;font-family:inherit}
-select{background:#0b1a27;border:1px solid var(--line);border-radius:4px;
-  color:#dce8f2;padding:5px 7px;font-size:12px}
+input[type=text]{background:#141c22;border:1px solid var(--line);border-radius:4px;
+  color:#dfe7ec;padding:5px 8px;font-size:12px;font-family:inherit}
+select{background:#141c22;border:1px solid var(--line);border-radius:4px;
+  color:#dfe7ec;padding:5px 7px;font-size:12px}
 input[type=range]{vertical-align:middle;width:150px}
 
 #wrap{display:flex;gap:16px;padding:14px 16px 40px;align-items:flex-start}
-#side{width:265px;flex:0 0 auto;background:#101f2e;border:1px solid var(--line);
+#side{width:265px;flex:0 0 auto;background:#18222a;border:1px solid var(--line);
   border-radius:8px;padding:10px;max-height:82vh;overflow:auto}
 #side h2{margin:0 0 8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;
   color:var(--gold);border-bottom:1px dashed var(--line);padding-bottom:6px}
 .it{padding:5px 7px;border-radius:4px;border-left:3px solid var(--line);cursor:pointer;
-  margin-bottom:3px;font-size:11.5px;background:#14283a}
-.it:hover{background:#1b3348}
-.it.cur{border-left-color:var(--gold);background:#1d3a52;color:var(--gold);font-weight:600}
+  margin-bottom:3px;font-size:11.5px;background:#1e2a33}
+.it:hover{background:#243039}
+.it.cur{border-left-color:var(--gold);background:#2a3640;color:var(--gold);font-weight:600}
 .it.done{border-left-color:var(--ok)}
 .it.skip{border-left-color:var(--skip);opacity:.6}
 .it .st{float:right;font-size:9.5px;color:var(--muted)}
 
-#main{flex:1;min-width:0;background:#101f2e;border:1px solid var(--line);
+#main{flex:1;min-width:0;background:#18222a;border:1px solid var(--line);
   border-radius:8px;padding:12px}
-#title{color:var(--gold);font-size:15px;font-weight:600}
+#title{color:#dfe7ec;font-size:16px;font-weight:700}
 #roleTxt{color:var(--muted);font-size:11.5px;margin:2px 0 10px}
 #drop{border:2px dashed var(--line);border-radius:8px;min-height:260px;
   display:flex;align-items:center;justify-content:center;flex-direction:column;
@@ -74,26 +77,35 @@ input[type=range]{vertical-align:middle;width:150px}
 #stageC{display:none}
 #cvwrap{position:relative;display:inline-block;max-width:100%}
 #cv{display:block;max-width:100%;border:1px solid var(--line);border-radius:4px;
-  cursor:crosshair;background:#06101a}
-#sel{position:absolute;border:1px solid var(--gold);background:#c8a84b22;
+  cursor:crosshair;background:#0b1013}
+#sel{position:absolute;border:1px solid var(--gold);background:rgba(240,166,58,.13);
   pointer-events:none;display:none}
 .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}
-.row label{color:#9fc0da;display:flex;gap:6px;align-items:center}
+.row label{color:#a9b7bf;display:flex;gap:6px;align-items:center}
 #pvwrap{margin-top:10px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
-#pv{border:1px solid var(--line);border-radius:4px;max-width:340px;background:#06101a}
+#pv{border:1px solid var(--line);border-radius:4px;max-width:340px;background:#0b1013}
 #info{font-size:11.5px;color:var(--muted);line-height:1.7}
-#info b{color:#dce8f2;font-weight:600}
+#info b{color:#dfe7ec;font-weight:600}
 .big{font-size:15px;color:var(--gold);font-weight:600}
-#bar{height:4px;background:#0b1a27;border-radius:2px;overflow:hidden;margin:8px 0 12px}
+#bar{height:4px;background:#141c22;border-radius:2px;overflow:hidden;margin:8px 0 12px}
 #barf{height:100%;background:var(--gold);width:0}
-#out{margin:16px;background:#101f2e;border:1px solid var(--line);border-radius:8px;
+#out{margin:16px;background:#18222a;border:1px solid var(--line);border-radius:8px;
   padding:12px;display:none}
-#out textarea{width:100%;height:220px;background:#06101a;color:#9fd0a8;border:1px solid var(--line);
-  border-radius:4px;font-family:Consolas,monospace;font-size:11px;padding:8px}
+#out textarea{width:100%;height:220px;background:#0b1013;color:#9fd0a8;border:1px solid var(--line);
+  border-radius:4px;font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;font-size:11px;padding:8px}
 footer{padding:12px 16px;color:var(--muted);font-size:10.5px;text-align:center}
+@media (max-width:700px){#wrap{flex-direction:column}#side{width:100%;max-height:40vh}#main{width:100%}}
+/* ---------- charte AZS (www.azs.fr) : bandeau ---------- */
+.azs-barre{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#141c22;border-bottom:1px solid #26343e;font:600 11px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:#8fa1ad}
+.azs-barre .azs{font:800 20px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:-1px;text-transform:none;color:#f0a63a;text-decoration:none;padding-right:12px;border-right:1px solid #26343e}
+.azs-barre .azs:hover{color:#ffcf7a}
+.azs-barre a.fil{color:#8fa1ad;text-decoration:none}
+.azs-barre a.fil:hover{color:#f0a63a}
+
 </style>
 </head>
 <body>
+<nav class="azs-barre"><a class="azs" href="https://www.azs.fr/" title="www.azs.fr">AZS</a><a class="fil" href="https://github.com/ericperret/photo">photo</a></nav>
 
 <header>
   <div>
@@ -367,7 +379,7 @@ function render(){
     + 'Recadrage <b>' + crop.w + ' &times; ' + crop.h + '</b><br>'
     + 'Sortie <b>' + ow + ' &times; ' + oh + '</b> &middot; ' + (fmt==="image/png"?"PNG":"JPEG " + $("q").value) + '<br>'
     + 'Poids encod&eacute; <span class="big">' + ko + ' Ko</span><br>'
-    + '<span style="color:#5a7a96">au-del&agrave; de 150 Ko par module, l\'organigramme s\'alourdit vite</span>';
+    + '<span style="color:#8fa1ad">au-del&agrave; de 150 Ko par module, l\'organigramme s\'alourdit vite</span>';
   $("fmt").disabled = false;
 }
 $("q").oninput = render;

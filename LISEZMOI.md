@@ -2,7 +2,7 @@
   Nom      : LISEZMOI.md
   Objet    : Présentation du dépôt photo (outils image et géodonnées dans le navigateur)
   Auteur   : Eric Perret
-  Date     : 2026-10-17
+  Date     : 2026-10-18
   Licence  : CC BY-NC 4.0
 -->
 
@@ -88,6 +88,7 @@ Outil d'appui à la documentation de la plateforme SEG973 (csvgen) : parcourt la
 |---|---|---|
 | Correction de perspective | 1.1 | Enregistrement corrigé : l'image sauvegardée était l'original non modifié (réglages appliqués en CSS seulement) ; téléchargement fiabilisé |
 | Niveaux YUV | 2.1 | Téléchargement fiabilisé |
+| Les six outils | 2026-10-18 | Charte graphique AZS : palette ardoise / ambre / cyan, bandeau AZS avec lien de retour vers www.azs.fr, thème sombre pour les niveaux YUV et la correction de perspective ; captures refaites |
 
 ## Licence
 

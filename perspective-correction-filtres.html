@@ -6,8 +6,8 @@
                perspective, échelle, inclinaisons X / Y, inversion, contraste ;
                enregistrement PNG de l'image telle qu'affichée
   Auteur     : Eric Perret
-  Version    : 1.1
-  Date       : 2026-10-17
+  Version    : 1.2
+  Date       : 2026-10-18
   Plateforme : HTML / CSS / JavaScript, fichier unique, aucune librairie
   Historique :
     1.0  2026-08-15  version publiée (réglages appliqués à l'affichage en CSS)
@@ -15,6 +15,8 @@
                      non modifié ; la projection 3D (homographie) et les filtres
                      sont désormais recalculés sur les pixels ; téléchargement
                      fiabilisé (lien ajouté à la page, URL libérée après coup)
+    1.2  2026-10-18  charte graphique AZS 
+                     (palette ardoise / ambre / cyan, bandeau AZS avec lien de retour vers www.azs.fr, polices système), thème sombre
 ================================================================================
 -->
 <html lang="fr">
@@ -23,138 +25,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Correction de Perspective</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            margin: 0;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-        
-        .controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-            padding: 20px;
-            background-color: #f8f8f8;
-            border-radius: 8px;
-        }
-        
-        .control-group {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        label {
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: #555;
-        }
-        
-        input[type="range"] {
-            width: 100%;
-            margin-bottom: 5px;
-        }
-        
-        .value-display {
-            text-align: center;
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .image-container {
-            position: relative;
-            display: inline-block;
-            margin: 20px auto;
-            text-align: center;
-            width: 100%;
-        }
-        
-        #canvas-wrapper {
-            position: relative;
-            display: inline-block;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            overflow: hidden;
-        }
-        
-        canvas {
-            display: block;
-            max-width: 100%;
-            height: auto;
-        }
-        
-        .buttons {
-            text-align: center;
-            margin-top: 20px;
-        }
-        
-        button {
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            margin: 0 5px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
-        }
-        
-        button:hover {
-            background-color: #45a049;
-        }
-        
-        button:active {
-            transform: scale(0.98);
-        }
-        
-        #resetBtn {
-            background-color: #f44336;
-        }
-        
-        #resetBtn:hover {
-            background-color: #da190b;
-        }
-        
-        #fileInput {
-            display: none;
-        }
-        
-        .info {
-            background-color: #e7f3ff;
-            border-left: 4px solid #2196F3;
-            padding: 15px;
-            margin-top: 20px;
-            border-radius: 4px;
-        }
-        
-        .info h3 {
-            margin-top: 0;
-            color: #1976D2;
-        }
-        
-        .info p {
-            margin: 5px 0;
-            color: #555;
-        }
+        /* ---------- charte AZS (www.azs.fr) ---------- */
+        :root { --bg:#0e1418; --pan:#18222a; --pan2:#141c22; --bd:#26343e; --fg:#dfe7ec; --mut:#8fa1ad; --acc:#f0a63a; --cyan:#5cc8d6; color-scheme:dark; }
+        body { font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; background: var(--bg); color: var(--fg); margin: 0; padding: 0 20px 20px; }
+        .container { max-width: 1200px; margin: 20px auto 0; background: var(--pan); border: 1px solid var(--bd); padding: 20px; border-radius: 8px;
+            box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 10px 30px -18px rgba(0,0,0,.8); }
+        h1 { text-align: center; color: var(--fg); letter-spacing: -.2px; }
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; padding: 20px;
+            background: var(--pan2); border: 1px solid var(--bd); border-radius: 8px; }
+        .control-group { display: flex; flex-direction: column; }
+        label { font: 600 10.5px ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; color: var(--mut); }
+        input[type="range"] { width: 100%; margin-bottom: 5px; accent-color: var(--acc); }
+        .value-display { text-align: center; color: var(--cyan); font: 13px ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace; }
+        .image-container { position: relative; display: inline-block; margin: 20px auto; text-align: center; width: 100%; }
+        #canvas-wrapper { position: relative; display: inline-block; border: 1px solid var(--bd); border-radius: 6px; overflow: hidden; background: var(--pan2); }
+        canvas { display: block; max-width: 100%; height: auto; }
+        .buttons { text-align: center; margin-top: 20px; }
+        button { background: var(--acc); color: #111; border: 1px solid var(--acc); padding: 10px 20px; margin: 0 5px 6px; border-radius: 6px; cursor: pointer;
+            font: 600 15px system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; transition: filter .15s, border-color .15s, color .15s; }
+        button:hover { filter: brightness(1.1); }
+        button:active { transform: scale(0.98); }
+        #resetBtn { background: transparent; color: var(--fg); border-color: var(--bd); font-weight: 500; }
+        #resetBtn:hover { filter: none; border-color: #f85149; color: #f85149; }
+        #fileInput { display: none; }
+        .info { background: var(--pan2); border-left: 3px solid var(--cyan); padding: 15px; margin-top: 20px; border-radius: 0 6px 6px 0; }
+        .info h3 { margin-top: 0; color: var(--fg); }
+        .info p { margin: 5px 0; color: var(--mut); }
+
+/* ---------- charte AZS (www.azs.fr) : bandeau ---------- */
+.azs-barre{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#141c22;border-bottom:1px solid #26343e;font:600 11px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:#8fa1ad;margin:0 -20px}
+.azs-barre .azs{font:800 20px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:-1px;text-transform:none;color:#f0a63a;text-decoration:none;padding-right:12px;border-right:1px solid #26343e}
+.azs-barre .azs:hover{color:#ffcf7a}
+.azs-barre a.fil{color:#8fa1ad;text-decoration:none}
+.azs-barre a.fil:hover{color:#f0a63a}
     </style>
 </head>
 <body>
+<nav class="azs-barre"><a class="azs" href="https://www.azs.fr/" title="www.azs.fr">AZS</a><a class="fil" href="https://github.com/ericperret/photo">photo</a></nav>
     <div class="container">
         <h1>Correction de Perspective d'Image</h1>
         
