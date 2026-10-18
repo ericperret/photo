@@ -88,6 +88,7 @@ Support tool for documenting the SEG973 platform (csvgen): walks through the mod
 |---|---|---|
 | Perspective correction | 1.1 | Saving fixed: the saved image was the unmodified original (settings applied in CSS only); download made reliable |
 | YUV levels | 2.1 | Download made reliable |
+| YUV levels | 2.3 | Neutral bounds (0 / 255) when an image is loaded and on reset: the image is no longer darkened by default and the handles match the displayed values |
 | All six tools | 2026-10-18 | AZS visual identity: slate / amber / cyan palette, AZS band linking back to www.azs.fr, dark theme for YUV levels and perspective correction; screenshots refreshed |
 
 ## License

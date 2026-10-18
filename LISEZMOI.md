@@ -88,6 +88,7 @@ Outil d'appui à la documentation de la plateforme SEG973 (csvgen) : parcourt la
 |---|---|---|
 | Correction de perspective | 1.1 | Enregistrement corrigé : l'image sauvegardée était l'original non modifié (réglages appliqués en CSS seulement) ; téléchargement fiabilisé |
 | Niveaux YUV | 2.1 | Téléchargement fiabilisé |
+| Niveaux YUV | 2.3 | Bornes neutres (0 / 255) au chargement d'une image et à la réinitialisation : l'image n'est plus assombrie d'office et les poignées correspondent aux valeurs affichées |
 | Les six outils | 2026-10-18 | Charte graphique AZS : palette ardoise / ambre / cyan, bandeau AZS avec lien de retour vers www.azs.fr, thème sombre pour les niveaux YUV et la correction de perspective ; captures refaites |
 
 ## Licence

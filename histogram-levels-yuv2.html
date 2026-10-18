@@ -5,15 +5,19 @@
   Objet      : réglage des niveaux d'une photo sur la luminance Y (bornes début /
                fin), histogrammes Y, U, V, enregistrement PNG de l'image traitée
   Auteur     : Eric Perret
-  Version    : 2.2
+  Version    : 2.3
   Date       : 2026-10-18
   Plateforme : HTML / CSS / JavaScript, fichier unique, aucune librairie
   Historique :
     2.0  2026-08-15  version publiée
     2.1  2026-10-17  téléchargement fiabilisé (lien ajouté à la page, URL libérée
                      après coup)
-    2.2  2026-10-18  charte graphique AZS 
-                     (palette ardoise / ambre / cyan, bandeau AZS avec lien de retour vers www.azs.fr, polices système), thème sombre
+    2.2  2026-10-18  charte graphique AZS (palette ardoise / ambre /
+                     cyan, bandeau AZS avec lien de retour vers www.azs.fr,
+                     polices système), thème sombre
+    2.3  2026-10-18  bornes neutres (0 / 255) au chargement d'une image et à la
+                     réinitialisation : l'image n'est plus assombrie d'office et
+                     les poignées correspondent aux valeurs affichées
 ================================================================================
 -->
 <html lang="fr">
@@ -131,9 +135,9 @@ let yHist = new Array(256).fill(0);
 let uHist = new Array(256).fill(0);
 let vHist = new Array(256).fill(0);
 
-// bornes sélectionnées (début/fin) sur Y
-let lowY = 220;
-let highY = 252;
+// bornes sélectionnées (début/fin) sur Y : neutres au départ (image inchangée)
+let lowY = 0;
+let highY = 255;
 
 // --- Charger une image ---
 document.getElementById('fileInput').addEventListener('change', e=>{
@@ -152,6 +156,7 @@ document.getElementById('fileInput').addEventListener('change', e=>{
       imgCtx.clearRect(0,0,w,h);
       imgCtx.drawImage(img, 0,0, w,h);
       originalImageData = imgCtx.getImageData(0,0,w,h);
+      lowY = 0; highY = 255; updateHandlesLabel();   // nouvelle image : bornes neutres
       computeHistograms();
       applyLevelsAndRender();
     };
@@ -162,7 +167,7 @@ document.getElementById('fileInput').addEventListener('change', e=>{
 
 // --- Réinitialiser ---
 document.getElementById('resetBtn').addEventListener('click', ()=>{
-  lowY = 220; highY = 253; updateHandlesLabel();
+  lowY = 0; highY = 255; updateHandlesLabel();
   if(originalImageData){
     computeHistograms();
     applyLevelsAndRender();
@@ -360,6 +365,7 @@ function applyLevelsAndRender(){
   }
   imgCtx.globalAlpha=1;
   originalImageData = imgCtx.getImageData(0,0,w,h);
+  updateHandlesLabel();
   computeHistograms();
   applyLevelsAndRender();
 })();
