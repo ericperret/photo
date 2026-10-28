@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+  Fichier   : captures.html
+  Objet     : Assistant de capture d'ecran pour organigramme.html.
+              Parcourt la liste des modules, attend un Ctrl+V, propose un
+              recadrage a la souris, un niveau de compression, une previsualisation
+              et le poids resultant. Produit le bloc SHOTS pret a coller dans
+              organigramme.html, et permet l'enregistrement image par image.
+              Bouton X : le module est marque "pas de capture a rendre".
+  Auteur    : Eric Perret - DGCAT / Mission Foncier / SEG973
+  Version   : 02
+  Date      : 2026-10-18
+  Techno    : HTML5 / CSS3 / JavaScript - aucune ressource externe (seul lien :
+              retour vers www.azs.fr), aucune librairie
+  Usage     : ouvrir dans un navigateur, capturer l'ecran (Impr.ecran / zone),
+              Ctrl+V dans la page, recadrer, valider, module suivant.
+              En fin de parcours : "Enregistrer shots.js" puis coller le bloc
+              dans organigramme.html a la place de l'objet SHOTS existant.
+              "Reprendre un shots.js" permet de continuer un travail commence.
+  Historique:
+    v01  2026-08-15  Creation.
+    v02  2026-10-18  charte graphique AZS (palette ardoise / ambre / cyan, bandeau AZS avec lien de retour vers www.azs.fr, polices système).
+================================================================================
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>csvgen - Assistant de captures</title>
+<style>
+:root{
+  --bg:#0e1418; --gold:#f0a63a; --champ:#5cc8d6; --muted:#8fa1ad;
+  --panel:#1e2a33; --line:#26343e; --ok:#3fb950; --skip:#e0793a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:#dfe7ec;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:13px}
+header{border-bottom:1px solid var(--line);padding:10px 16px;display:flex;
+  gap:14px;align-items:center;flex-wrap:wrap}
+header h1{margin:0;font-size:16px;color:#dfe7ec;letter-spacing:-.1px}
+header .sub{color:var(--muted);font-size:11px}
+.hctrl{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+button{background:var(--panel);color:#dfe7ec;border:1px solid var(--line);
+  border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px}
+button:hover{border-color:var(--gold);color:var(--gold)}
+button.pri:hover{color:#111;filter:brightness(1.1)}
+button.pri{background:var(--gold);color:#111;border-color:var(--gold);font-weight:600}
+button.x{border-color:#5c3520;color:#e0793a}
+button:disabled{opacity:.35;cursor:default}
+input[type=text]{background:#141c22;border:1px solid var(--line);border-radius:4px;
+  color:#dfe7ec;padding:5px 8px;font-size:12px;font-family:inherit}
+select{background:#141c22;border:1px solid var(--line);border-radius:4px;
+  color:#dfe7ec;padding:5px 7px;font-size:12px}
+input[type=range]{vertical-align:middle;width:150px}
+
+#wrap{display:flex;gap:16px;padding:14px 16px 40px;align-items:flex-start}
+#side{width:265px;flex:0 0 auto;background:#18222a;border:1px solid var(--line);
+  border-radius:8px;padding:10px;max-height:82vh;overflow:auto}
+#side h2{margin:0 0 8px;font-size:11px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--gold);border-bottom:1px dashed var(--line);padding-bottom:6px}
+.it{padding:5px 7px;border-radius:4px;border-left:3px solid var(--line);cursor:pointer;
+  margin-bottom:3px;font-size:11.5px;background:#1e2a33}
+.it:hover{background:#243039}
+.it.cur{border-left-color:var(--gold);background:#2a3640;color:var(--gold);font-weight:600}
+.it.done{border-left-color:var(--ok)}
+.it.skip{border-left-color:var(--skip);opacity:.6}
+.it .st{float:right;font-size:9.5px;color:var(--muted)}
+
+#main{flex:1;min-width:0;background:#18222a;border:1px solid var(--line);
+  border-radius:8px;padding:12px}
+#title{color:#dfe7ec;font-size:16px;font-weight:700}
+#roleTxt{color:var(--muted);font-size:11.5px;margin:2px 0 10px}
+#drop{border:2px dashed var(--line);border-radius:8px;min-height:260px;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  gap:8px;color:var(--muted);text-align:center;padding:20px}
+#drop b{color:var(--gold);font-size:16px}
+#stageC{display:none}
+#cvwrap{position:relative;display:inline-block;max-width:100%}
+#cv{display:block;max-width:100%;border:1px solid var(--line);border-radius:4px;
+  cursor:crosshair;background:#0b1013}
+#sel{position:absolute;border:1px solid var(--gold);background:rgba(240,166,58,.13);
+  pointer-events:none;display:none}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.row label{color:#a9b7bf;display:flex;gap:6px;align-items:center}
+#pvwrap{margin-top:10px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+#pv{border:1px solid var(--line);border-radius:4px;max-width:340px;background:#0b1013}
+#info{font-size:11.5px;color:var(--muted);line-height:1.7}
+#info b{color:#dfe7ec;font-weight:600}
+.big{font-size:15px;color:var(--gold);font-weight:600}
+#bar{height:4px;background:#141c22;border-radius:2px;overflow:hidden;margin:8px 0 12px}
+#barf{height:100%;background:var(--gold);width:0}
+#out{margin:16px;background:#18222a;border:1px solid var(--line);border-radius:8px;
+  padding:12px;display:none}
+#out textarea{width:100%;height:220px;background:#0b1013;color:#9fd0a8;border:1px solid var(--line);
+  border-radius:4px;font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;font-size:11px;padding:8px}
+footer{padding:12px 16px;color:var(--muted);font-size:10.5px;text-align:center}
+@media (max-width:700px){#wrap{flex-direction:column}#side{width:100%;max-height:40vh}#main{width:100%}}
+/* ---------- charte AZS (www.azs.fr) : bandeau ---------- */
+.azs-barre{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#141c22;border-bottom:1px solid #26343e;font:600 11px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:#8fa1ad}
+.azs-barre .azs{font:800 20px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:-1px;text-transform:none;color:#f0a63a;text-decoration:none;padding-right:12px;border-right:1px solid #26343e}
+.azs-barre .azs:hover{color:#ffcf7a}
+.azs-barre a.fil{color:#8fa1ad;text-decoration:none}
+.azs-barre a.fil:hover{color:#f0a63a}
+
+</style>
+</head>
+<body>
+<nav class="azs-barre"><a class="azs" href="https://www.azs.fr/" title="www.azs.fr">AZS</a><a class="fil" href="https://github.com/ericperret/photo">photo</a></nav>
+
+<header>
+  <div>
+    <h1>Assistant de captures &mdash; csvgen</h1>
+    <div class="sub">Ctrl+V pour coller &middot; glisser pour recadrer &middot; X si la page n'est pas &agrave; rendre</div>
+  </div>
+  <div class="hctrl">
+    <button id="bImport">Reprendre un shots.js</button>
+    <input type="file" id="fImport" accept=".js,.txt" style="display:none">
+    <button id="bExport" class="pri">Enregistrer shots.js</button>
+  </div>
+</header>
+
+<div id="wrap">
+  <div id="side">
+    <h2>Modules <span class="st" id="prog"></span></h2>
+    <div id="list"></div>
+  </div>
+
+  <div id="main">
+    <div id="title"></div>
+    <div id="roleTxt"></div>
+    <div id="bar"><div id="barf"></div></div>
+
+    <div id="drop">
+      <b>Ctrl+V</b>
+      <div>Capturez la fen&ecirc;tre (Impr.&eacute;cran, ou Maj+Impr.&eacute;cran pour une zone)<br>puis collez ici.</div>
+      <div style="font-size:11px">Un glisser-d&eacute;poser de fichier image fonctionne aussi.</div>
+    </div>
+
+    <div id="stageC">
+      <div id="cvwrap"><canvas id="cv"></canvas><div id="sel"></div></div>
+      <div class="row">
+        <button id="bFull">Image enti&egrave;re</button>
+        <label>Largeur
+          <select id="mw">
+            <option value="0">native</option>
+            <option value="1600">1600 px</option>
+            <option value="1280" selected>1280 px</option>
+            <option value="1024">1024 px</option>
+            <option value="800">800 px</option>
+          </select>
+        </label>
+        <label>Compression
+          <input type="range" id="q" min="30" max="95" value="72">
+          <span id="qv">72</span>
+        </label>
+        <label>Format
+          <select id="fmt">
+            <option value="image/jpeg" selected>JPEG</option>
+            <option value="image/png">PNG</option>
+          </select>
+        </label>
+      </div>
+      <div id="pvwrap">
+        <canvas id="pv"></canvas>
+        <div id="info"></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button id="bOk" class="pri">Valider et suivant</button>
+        <button id="bSave">Enregistrer l'image sur disque</button>
+        <label>nom <input type="text" id="fname" size="26"></label>
+        <button id="bRedo">Recoller</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:12px">
+      <button id="bPrev">&larr; Pr&eacute;c&eacute;dent</button>
+      <button id="bNext">Suivant &rarr;</button>
+      <button id="bSkip" class="x">X &mdash; pas de capture &agrave; rendre</button>
+    </div>
+  </div>
+</div>
+
+<div id="out">
+  <div style="color:var(--gold);font-size:12px;margin-bottom:6px">
+    Bloc &agrave; coller dans organigramme.html &agrave; la place de l'objet SHOTS
+  </div>
+  <textarea id="code" spellcheck="false"></textarea>
+  <div class="row"><button id="bCopy">Copier</button><button id="bClose">Fermer</button></div>
+</div>
+
+<footer>captures.html &middot; v01 &middot; 2026-08-15 &middot; E. Perret &middot; sans librairie externe</footer>
+
+<script>
+/* ---------- Liste des modules, dans l'ordre de l'organigramme ---------- */
+var MODS = [
+ ["logme.jsp","Accueil, authentification, menu g&eacute;n&eacute;ral"],
+ ["user.jsp","Comptes, r&ocirc;les, stagiaires"],
+ ["user_couleurs.jsp","Palette personnelle"],
+ ["sante.jsp","Supervision serveur"],
+ ["mem.jsp","M&eacute;moire JVM"],
+ ["maj.jsp","Migration annuelle cadastre DRFIP"],
+ ["config.jsp","Param&eacute;trage cat&eacute;gories"],
+ ["demandeur.jsp","Fiche personne, r&eacute;f&eacute;rentiels, fusion"],
+ ["demandeurs.jsp","Liste et recherche demandeurs"],
+ ["radar.jsp","D&eacute;tection doublons / homonymes"],
+ ["ech6m.jsp","&Eacute;ch&eacute;ancier 6 mois"],
+ ["dossier.jsp","Fiche dossier, &eacute;v&eacute;nements, PDF"],
+ ["dossier_new.jsp","Cr&eacute;ation dossier + parcelles"],
+ ["dossiers.jsp","Liste g&eacute;n&eacute;rale des dossiers"],
+ ["dosfilter.jsp","Filtres, correction &eacute;tat/&eacute;tape"],
+ ["enquete_saisie.jsp","Saisie enqu&ecirc;te terrain"],
+ ["bizarres_ajax.jsp","Anomalies de coh&eacute;rence"],
+ ["parcelle_ajax.jsp","R&eacute;solution IDU"],
+ ["arrete.jsp","G&eacute;n&eacute;ration arr&ecirc;t&eacute;s"],
+ ["upload.jsp","D&eacute;p&ocirc;t pi&egrave;ces, export CSV"],
+ ["export.jsp","Exports m&eacute;tier"],
+ ["safer.jsp","Notation dossiers, p&eacute;rim&egrave;tre"],
+ ["safer_admin.jsp","Ing&eacute;rence DINAMIS, lots, indexation"],
+ ["glouton.jsp","Moissonnage orthos / carr&eacute;s"],
+ ["zoom.jsp","Mesure de surface assist&eacute;e"],
+ ["zoom2.jsp","Filtres visible et infrarouge"],
+ ["wms.jsp","Serveur d'images : ortho + terrain 3D"],
+ ["rpc.jsp","Orthorectification Pl&eacute;iades / SPOT"],
+ ["parcelle3d.jsp","Vue 3D parcelle sur terrain"],
+ ["training.jsp","Reconnaissance de formes"],
+ ["moteur.jsp","Matrice de reconnaissance de formes"],
+ ["rec.jsp","R&eacute;conciliation, contr&ocirc;le DCD"],
+ ["parcelle_injecteur.jsp","Injection parcelles"],
+ ["dossiers_dans_la_couche.jsp","Croisement couche / dossiers"],
+ ["echecs.jsp","&Eacute;checs &mdash; jeu"],
+ ["dashboard.jsp","Tableau de bord d&eacute;cisionnel"],
+ ["carte.jsp","Cartographie des dossiers"]
+];
+
+var SHOTS = {};      /* id -> dataURL       */
+var STATE = {};      /* id -> "done"|"skip" */
+var cur = 0;
+var img = null, natW = 0, natH = 0;
+var crop = null;     /* {x,y,w,h} en coordonnees naturelles */
+
+var $ = function(id){ return document.getElementById(id); };
+var cv = $("cv"), pv = $("pv"), sel = $("sel");
+
+/* ---------- Liste laterale ---------- */
+function renderList(){
+  var h = "", done = 0, skip = 0;
+  for(var i=0;i<MODS.length;i++){
+    var id = MODS[i][0], st = STATE[id] || "";
+    if(st === "done") done++; if(st === "skip") skip++;
+    h += '<div class="it' + (i===cur?" cur":"") + (st?" "+st:"") + '" data-i="' + i + '">'
+       + id + '<span class="st">' + (st==="done"?"OK":st==="skip"?"X":"") + '</span></div>';
+  }
+  $("list").innerHTML = h;
+  $("prog").textContent = done + " / " + MODS.length + (skip? "  (" + skip + " X)" : "");
+  $("barf").style.width = Math.round(100*(done+skip)/MODS.length) + "%";
+  var its = $("list").getElementsByClassName("it");
+  for(var k=0;k<its.length;k++){
+    its[k].onclick = (function(n){ return function(){ go(n); }; })(parseInt(its[k].getAttribute("data-i"),10));
+  }
+  var c = $("list").getElementsByClassName("cur")[0];
+  if(c && c.scrollIntoView) c.scrollIntoView({block:"nearest"});
+}
+
+function decode(s){ var d=document.createElement("div"); d.innerHTML=s; return d.textContent; }
+
+function go(n){
+  if(n < 0) n = 0;
+  if(n > MODS.length-1) n = MODS.length-1;
+  cur = n;
+  var id = MODS[cur][0];
+  $("title").textContent = id;
+  $("roleTxt").innerHTML = MODS[cur][1];
+  $("fname").value = id.replace(/\.jsp$/,"") + ".jpg";
+  img = null; crop = null;
+  $("stageC").style.display = "none";
+  $("drop").style.display = "flex";
+  if(SHOTS[id]){
+    var im = new Image();
+    im.onload = function(){ setImage(im); };
+    im.src = SHOTS[id];
+  }
+  renderList();
+}
+
+/* ---------- Reception d'une image ---------- */
+function setImage(im){
+  img = im; natW = im.naturalWidth || im.width; natH = im.naturalHeight || im.height;
+  crop = {x:0, y:0, w:natW, h:natH};
+  var box = $("main").clientWidth - 30;
+  var dispW = Math.min(natW, box, 900);
+  var k = dispW / natW;
+  cv.width = Math.round(natW * k); cv.height = Math.round(natH * k);
+  cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height);
+  sel.style.display = "none";
+  $("drop").style.display = "none";
+  $("stageC").style.display = "block";
+  render();
+}
+function fromBlob(blob){
+  var fr = new FileReader();
+  fr.onload = function(){ var im = new Image(); im.onload = function(){ setImage(im); }; im.src = fr.result; };
+  fr.readAsDataURL(blob);
+}
+document.addEventListener("paste", function(e){
+  var it = e.clipboardData && e.clipboardData.items;
+  if(!it) return;
+  for(var i=0;i<it.length;i++){
+    if(it[i].type.indexOf("image") === 0){ fromBlob(it[i].getAsFile()); e.preventDefault(); return; }
+  }
+});
+document.addEventListener("dragover", function(e){ e.preventDefault(); });
+document.addEventListener("drop", function(e){
+  e.preventDefault();
+  var f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f && f.type.indexOf("image") === 0) fromBlob(f);
+});
+
+/* ---------- Recadrage ---------- */
+var dragging = false, sx=0, sy=0;
+cv.onmousedown = function(e){
+  if(!img) return;
+  var r = cv.getBoundingClientRect();
+  sx = e.clientX - r.left; sy = e.clientY - r.top;
+  dragging = true;
+  sel.style.display = "block";
+  sel.style.left = sx + "px"; sel.style.top = sy + "px";
+  sel.style.width = "0px"; sel.style.height = "0px";
+  e.preventDefault();
+};
+document.onmousemove = function(e){
+  if(!dragging) return;
+  var r = cv.getBoundingClientRect();
+  var x = Math.max(0, Math.min(cv.width,  e.clientX - r.left));
+  var y = Math.max(0, Math.min(cv.height, e.clientY - r.top));
+  sel.style.left = Math.min(sx,x) + "px"; sel.style.top = Math.min(sy,y) + "px";
+  sel.style.width = Math.abs(x-sx) + "px"; sel.style.height = Math.abs(y-sy) + "px";
+};
+document.onmouseup = function(e){
+  if(!dragging) return;
+  dragging = false;
+  var r = cv.getBoundingClientRect();
+  var x = Math.max(0, Math.min(cv.width,  e.clientX - r.left));
+  var y = Math.max(0, Math.min(cv.height, e.clientY - r.top));
+  var w = Math.abs(x-sx), h = Math.abs(y-sy);
+  if(w < 8 || h < 8){ sel.style.display = "none"; crop = {x:0,y:0,w:natW,h:natH}; render(); return; }
+  var k = natW / cv.width;
+  crop = {x:Math.round(Math.min(sx,x)*k), y:Math.round(Math.min(sy,y)*k),
+          w:Math.round(w*k), h:Math.round(h*k)};
+  render();
+};
+$("bFull").onclick = function(){
+  if(!img) return;
+  crop = {x:0,y:0,w:natW,h:natH}; sel.style.display = "none"; render();
+};
+
+/* ---------- Rendu et poids ---------- */
+var lastURL = "";
+function render(){
+  if(!img || !crop) return;
+  var maxw = parseInt($("mw").value, 10) || crop.w;
+  var k = Math.min(1, maxw / crop.w);
+  var ow = Math.max(1, Math.round(crop.w * k)), oh = Math.max(1, Math.round(crop.h * k));
+  var off = document.createElement("canvas");
+  off.width = ow; off.height = oh;
+  var c = off.getContext("2d");
+  c.fillStyle = "#ffffff"; c.fillRect(0,0,ow,oh);
+  c.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, ow, oh);
+  var fmt = $("fmt").value, q = parseInt($("q").value,10)/100;
+  lastURL = (fmt === "image/png") ? off.toDataURL("image/png") : off.toDataURL("image/jpeg", q);
+
+  var pw = Math.min(340, ow), pk = pw / ow;
+  pv.width = Math.round(ow*pk); pv.height = Math.round(oh*pk);
+  pv.getContext("2d").drawImage(off, 0, 0, pv.width, pv.height);
+
+  var ko = Math.round(lastURL.length * 0.75 / 1024);
+  $("qv").textContent = $("q").value;
+  $("info").innerHTML =
+      'Source <b>' + natW + ' &times; ' + natH + '</b><br>'
+    + 'Recadrage <b>' + crop.w + ' &times; ' + crop.h + '</b><br>'
+    + 'Sortie <b>' + ow + ' &times; ' + oh + '</b> &middot; ' + (fmt==="image/png"?"PNG":"JPEG " + $("q").value) + '<br>'
+    + 'Poids encod&eacute; <span class="big">' + ko + ' Ko</span><br>'
+    + '<span style="color:#8fa1ad">au-del&agrave; de 150 Ko par module, l\'organigramme s\'alourdit vite</span>';
+  $("fmt").disabled = false;
+}
+$("q").oninput = render;
+$("mw").onchange = render;
+$("fmt").onchange = render;
+
+/* ---------- Actions ---------- */
+$("bOk").onclick = function(){
+  if(!lastURL) return;
+  var id = MODS[cur][0];
+  SHOTS[id] = lastURL; STATE[id] = "done";
+  renderList();
+  go(cur + 1);
+};
+$("bSkip").onclick = function(){
+  var id = MODS[cur][0];
+  delete SHOTS[id]; STATE[id] = "skip";
+  renderList();
+  go(cur + 1);
+};
+$("bRedo").onclick = function(){
+  img = null; crop = null; lastURL = "";
+  $("stageC").style.display = "none"; $("drop").style.display = "flex";
+};
+$("bPrev").onclick = function(){ go(cur - 1); };
+$("bNext").onclick = function(){ go(cur + 1); };
+
+function dl(name, blobOrUrl){
+  var a = document.createElement("a");
+  a.href = blobOrUrl; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+$("bSave").onclick = function(){
+  if(!lastURL) return;
+  var n = $("fname").value.replace(/[^A-Za-z0-9._-]/g,"_") || "capture.jpg";
+  if($("fmt").value === "image/png" && !/\.png$/i.test(n)) n = n.replace(/\.[a-z]+$/i,"") + ".png";
+  dl(n, lastURL);
+};
+
+/* ---------- Export / import du bloc SHOTS ---------- */
+function buildCode(){
+  var lines = [], n = 0;
+  for(var i=0;i<MODS.length;i++){
+    var id = MODS[i][0];
+    if(SHOTS[id]){ lines.push('  "' + id + '" : "' + SHOTS[id] + '"'); n++; }
+  }
+  return "/* SHOTS - " + n + " captures - genere par captures.html le "
+       + new Date().toISOString().slice(0,10) + " */\nvar SHOTS = {\n"
+       + lines.join(",\n") + "\n};\n";
+}
+$("bExport").onclick = function(){
+  var txt = buildCode();
+  $("code").value = txt;
+  $("out").style.display = "block";
+  dl("shots.js", "data:text/javascript;charset=utf-8," + encodeURIComponent(txt));
+};
+$("bCopy").onclick = function(){
+  $("code").select();
+  try{ document.execCommand("copy"); this.textContent = "Copi\u00e9"; }catch(e){}
+};
+$("bClose").onclick = function(){ $("out").style.display = "none"; };
+
+$("bImport").onclick = function(){ $("fImport").click(); };
+$("fImport").onchange = function(){
+  var f = this.files[0]; if(!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    var t = fr.result;
+    var re = /"([A-Za-z0-9_.-]+\.jsp)"\s*:\s*"(data:image\/[^"]+)"/g, m, n = 0;
+    while((m = re.exec(t)) !== null){ SHOTS[m[1]] = m[2]; STATE[m[1]] = "done"; n++; }
+    renderList(); go(cur);
+    alert(n + " capture(s) reprise(s).");
+  };
+  fr.readAsText(f);
+  this.value = "";
+};
+
+/* ---------- Raccourcis ---------- */
+document.addEventListener("keydown", function(e){
+  if(e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+  if(e.key === "ArrowRight") go(cur+1);
+  if(e.key === "ArrowLeft")  go(cur-1);
+  if(e.key === "Enter" && lastURL) $("bOk").onclick();
+  if(e.key === "x" || e.key === "X") $("bSkip").onclick();
+});
+
+go(0);
+</script>
+</body>
+</html>

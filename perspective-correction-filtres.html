@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+  Nom        : perspective-correction-filtres.html
+  Objet      : correction de perspective d'une photo : rotations X / Y / Z,
+               perspective, échelle, inclinaisons X / Y, inversion, contraste ;
+               enregistrement PNG de l'image telle qu'affichée
+  Auteur     : Eric Perret
+  Version    : 1.2
+  Date       : 2026-10-18
+  Plateforme : HTML / CSS / JavaScript, fichier unique, aucune librairie
+  Historique :
+    1.0  2026-08-15  version publiée (réglages appliqués à l'affichage en CSS)
+    1.1  2026-10-17  enregistrement corrigé : l'image sauvegardée était l'original
+                     non modifié ; la projection 3D (homographie) et les filtres
+                     sont désormais recalculés sur les pixels ; téléchargement
+                     fiabilisé (lien ajouté à la page, URL libérée après coup)
+    1.2  2026-10-18  charte graphique AZS (palette ardoise / ambre /
+                     cyan, bandeau AZS avec lien de retour vers www.azs.fr,
+                     polices système), thème sombre
+================================================================================
+-->
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Correction de Perspective</title>
+    <style>
+        /* ---------- charte AZS (www.azs.fr) ---------- */
+        :root { --bg:#0e1418; --pan:#18222a; --pan2:#141c22; --bd:#26343e; --fg:#dfe7ec; --mut:#8fa1ad; --acc:#f0a63a; --cyan:#5cc8d6; color-scheme:dark; }
+        body { font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; background: var(--bg); color: var(--fg); margin: 0; padding: 0 20px 20px; }
+        .container { max-width: 1200px; margin: 20px auto 0; background: var(--pan); border: 1px solid var(--bd); padding: 20px; border-radius: 8px;
+            box-shadow: 0 1px 0 rgba(255,255,255,.03) inset, 0 10px 30px -18px rgba(0,0,0,.8); }
+        h1 { text-align: center; color: var(--fg); letter-spacing: -.2px; }
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; padding: 20px;
+            background: var(--pan2); border: 1px solid var(--bd); border-radius: 8px; }
+        .control-group { display: flex; flex-direction: column; }
+        label { font: 600 10.5px ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; color: var(--mut); }
+        input[type="range"] { width: 100%; margin-bottom: 5px; accent-color: var(--acc); }
+        .value-display { text-align: center; color: var(--cyan); font: 13px ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace; }
+        .image-container { position: relative; display: inline-block; margin: 20px auto; text-align: center; width: 100%; }
+        #canvas-wrapper { position: relative; display: inline-block; border: 1px solid var(--bd); border-radius: 6px; overflow: hidden; background: var(--pan2); }
+        canvas { display: block; max-width: 100%; height: auto; }
+        .buttons { text-align: center; margin-top: 20px; }
+        button { background: var(--acc); color: #111; border: 1px solid var(--acc); padding: 10px 20px; margin: 0 5px 6px; border-radius: 6px; cursor: pointer;
+            font: 600 15px system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; transition: filter .15s, border-color .15s, color .15s; }
+        button:hover { filter: brightness(1.1); }
+        button:active { transform: scale(0.98); }
+        #resetBtn { background: transparent; color: var(--fg); border-color: var(--bd); font-weight: 500; }
+        #resetBtn:hover { filter: none; border-color: #f85149; color: #f85149; }
+        #fileInput { display: none; }
+        .info { background: var(--pan2); border-left: 3px solid var(--cyan); padding: 15px; margin-top: 20px; border-radius: 0 6px 6px 0; }
+        .info h3 { margin-top: 0; color: var(--fg); }
+        .info p { margin: 5px 0; color: var(--mut); }
+
+/* ---------- charte AZS (www.azs.fr) : bandeau ---------- */
+.azs-barre{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#141c22;border-bottom:1px solid #26343e;font:600 11px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:#8fa1ad;margin:0 -20px}
+.azs-barre .azs{font:800 20px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;letter-spacing:-1px;text-transform:none;color:#f0a63a;text-decoration:none;padding-right:12px;border-right:1px solid #26343e}
+.azs-barre .azs:hover{color:#ffcf7a}
+.azs-barre a.fil{color:#8fa1ad;text-decoration:none}
+.azs-barre a.fil:hover{color:#f0a63a}
+    </style>
+</head>
+<body>
+<nav class="azs-barre"><a class="azs" href="https://www.azs.fr/" title="www.azs.fr">AZS</a><a class="fil" href="https://github.com/ericperret/photo">photo</a></nav>
+    <div class="container">
+        <h1>Correction de Perspective d'Image</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="rotateX">Rotation X (Inclinaison verticale)</label>
+                <input type="range" id="rotateX" min="-60" max="60" value="0" step="1">
+                <span class="value-display" id="rotateXValue">0°</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="rotateY">Rotation Y (Inclinaison horizontale)</label>
+                <input type="range" id="rotateY" min="-60" max="60" value="0" step="1">
+                <span class="value-display" id="rotateYValue">0°</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="rotateZ">Rotation Z (Rotation dans le plan)</label>
+                <input type="range" id="rotateZ" min="-180" max="180" value="0" step="1">
+                <span class="value-display" id="rotateZValue">0°</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="perspective">Perspective</label>
+                <input type="range" id="perspective" min="200" max="2000" value="1000" step="50">
+                <span class="value-display" id="perspectiveValue">1000px</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="scale">Échelle</label>
+                <input type="range" id="scale" min="0.5" max="2" value="1" step="0.1">
+                <span class="value-display" id="scaleValue">1.0x</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="skewX">Inclinaison X</label>
+                <input type="range" id="skewX" min="-30" max="30" value="0" step="1">
+                <span class="value-display" id="skewXValue">0°</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="skewY">Inclinaison Y</label>
+                <input type="range" id="skewY" min="-30" max="30" value="0" step="1">
+                <span class="value-display" id="skewYValue">0°</span>
+            </div>
+
+            <!-- Nouveau slider inversion -->
+            <div class="control-group">
+                <label for="invert">Inversion (négatif)</label>
+                <input type="range" id="invert" min="0" max="100" value="0" step="1">
+                <span class="value-display" id="invertValue">0%</span>
+            </div>
+
+            <!-- Nouveau slider contraste -->
+            <div class="control-group">
+                <label for="contrast">Contraste</label>
+                <input type="range" id="contrast" min="50" max="200" value="100" step="1">
+                <span class="value-display" id="contrastValue">100%</span>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <input type="file" id="fileInput" accept="image/*">
+            <button onclick="document.getElementById('fileInput').click()">Charger une image</button>
+            <button id="resetBtn" onclick="resetTransform()">Réinitialiser</button>
+            <button onclick="saveImage()">Sauvegarder l'image</button>
+        </div>
+        
+        <div class="image-container">
+            <div id="canvas-wrapper">
+                <canvas id="imageCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="info">
+            <h3>Guide d'utilisation :</h3>
+            <p><strong>1.</strong> Cliquez sur "Charger une image" pour sélectionner votre photo</p>
+            <p><strong>2.</strong> Utilisez les curseurs pour ajuster la perspective et les filtres</p>
+            <p>&nbsp;&nbsp;&nbsp;&nbsp;• <strong>Rotation X/Y</strong> : Pour corriger l'inclinaison</p>
+            <p>&nbsp;&nbsp;&nbsp;&nbsp;• <strong>Inversion</strong> : Pour passer en négatif progressif</p>
+            <p>&nbsp;&nbsp;&nbsp;&nbsp;• <strong>Contraste</strong> : Pour renforcer ou réduire le contraste</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('imageCanvas');
+        const ctx = canvas.getContext('2d');
+        let img = new Image();
+        let originalImage = null;
+        
+        let transform = {
+            rotateX: 0,
+            rotateY: 0,
+            rotateZ: 0,
+            perspective: 1000,
+            scale: 1,
+            skewX: 0,
+            skewY: 0,
+            invert: 0,
+            contrast: 100
+        };
+        
+        img.onload = function() {
+            originalImage = img;
+            canvas.width = img.width;
+            canvas.height = img.height;
+            drawImage();
+        };
+        
+        function createDefaultImage() {
+            canvas.width = 600;
+            canvas.height = 400;
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const squareSize = 50;
+            for (let i = 0; i < canvas.height / squareSize; i++) {
+                for (let j = 0; j < canvas.width / squareSize; j++) {
+                    if ((i + j) % 2 === 0) {
+                        ctx.fillStyle = '#333';
+                        ctx.fillRect(j * squareSize, i * squareSize, squareSize, squareSize);
+                    }
+                }
+            }
+            
+            ctx.fillStyle = '#4CAF50';
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('PERSPECTIVE', canvas.width / 2, canvas.height / 2);
+            
+            canvas.toBlob(function(blob) {
+                img.src = URL.createObjectURL(blob);
+            });
+        }
+        
+        createDefaultImage();
+        
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    img = new Image();
+                    img.onload = function() {
+                        originalImage = img;
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        drawImage();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        function drawImage() {
+            if (!originalImage) return;
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const wrapper = document.getElementById('canvas-wrapper');
+            wrapper.style.perspective = transform.perspective + 'px';
+            
+            canvas.style.transform = `
+                rotateX(${transform.rotateX}deg)
+                rotateY(${transform.rotateY}deg)
+                rotateZ(${transform.rotateZ}deg)
+                scale(${transform.scale})
+                skewX(${transform.skewX}deg)
+                skewY(${transform.skewY}deg)
+            `;
+            
+            canvas.style.filter = `
+                invert(${transform.invert}%)
+                contrast(${transform.contrast}%)
+            `;
+            
+            ctx.drawImage(originalImage, 0, 0);
+            ctx.restore();
+        }
+        
+        document.getElementById('rotateX').addEventListener('input', function(e) {
+            transform.rotateX = e.target.value;
+            document.getElementById('rotateXValue').textContent = e.target.value + '°';
+            drawImage();
+        });
+        
+        document.getElementById('rotateY').addEventListener('input', function(e) {
+            transform.rotateY = e.target.value;
+            document.getElementById('rotateYValue').textContent = e.target.value + '°';
+            drawImage();
+        });
+        
+        document.getElementById('rotateZ').addEventListener('input', function(e) {
+            transform.rotateZ = e.target.value;
+            document.getElementById('rotateZValue').textContent = e.target.value + '°';
+            drawImage();
+        });
+        
+        document.getElementById('perspective').addEventListener('input', function(e) {
+            transform.perspective = e.target.value;
+            document.getElementById('perspectiveValue').textContent = e.target.value + 'px';
+            drawImage();
+        });
+        
+        document.getElementById('scale').addEventListener('input', function(e) {
+            transform.scale = e.target.value;
+            document.getElementById('scaleValue').textContent = e.target.value + 'x';
+            drawImage();
+        });
+        
+        document.getElementById('skewX').addEventListener('input', function(e) {
+            transform.skewX = e.target.value;
+            document.getElementById('skewXValue').textContent = e.target.value + '°';
+            drawImage();
+        });
+        
+        document.getElementById('skewY').addEventListener('input', function(e) {
+            transform.skewY = e.target.value;
+            document.getElementById('skewYValue').textContent = e.target.value + '°';
+            drawImage();
+        });
+
+        document.getElementById('invert').addEventListener('input', function(e) {
+            transform.invert = e.target.value;
+            document.getElementById('invertValue').textContent = e.target.value + '%';
+            drawImage();
+        });
+
+        document.getElementById('contrast').addEventListener('input', function(e) {
+            transform.contrast = e.target.value;
+            document.getElementById('contrastValue').textContent = e.target.value + '%';
+            drawImage();
+        });
+        
+        function resetTransform() {
+            transform = {
+                rotateX: 0,
+                rotateY: 0,
+                rotateZ: 0,
+                perspective: 1000,
+                scale: 1,
+                skewX: 0,
+                skewY: 0,
+                invert: 0,
+                contrast: 100
+            };
+            
+            document.getElementById('rotateX').value = 0;
+            document.getElementById('rotateY').value = 0;
+            document.getElementById('rotateZ').value = 0;
+            document.getElementById('perspective').value = 1000;
+            document.getElementById('scale').value = 1;
+            document.getElementById('skewX').value = 0;
+            document.getElementById('skewY').value = 0;
+            document.getElementById('invert').value = 0;
+            document.getElementById('contrast').value = 100;
+            
+            document.getElementById('rotateXValue').textContent = '0°';
+            document.getElementById('rotateYValue').textContent = '0°';
+            document.getElementById('rotateZValue').textContent = '0°';
+            document.getElementById('perspectiveValue').textContent = '1000px';
+            document.getElementById('scaleValue').textContent = '1.0x';
+            document.getElementById('skewXValue').textContent = '0°';
+            document.getElementById('skewYValue').textContent = '0°';
+            document.getElementById('invertValue').textContent = '0%';
+            document.getElementById('contrastValue').textContent = '100%';
+            
+            drawImage();
+        }
+        
+        // Sauvegarde de l'image telle qu'affichée : la rotation 3D, la perspective,
+        // l'échelle, l'inclinaison et les filtres ne sont appliqués qu'en CSS à
+        // l'affichage ; ils sont ici recalculés sur les pixels.
+        // Le plan de l'image (z = 0, origine au centre) est projeté par la matrice
+        // CSS M = Rx·Ry·Rz·S·Kx·Ky puis par la perspective d du cadre (origine au
+        // centre) : homographie H. Chaque pixel de sortie est ramené dans l'image
+        // source par H⁻¹ (interpolation bilinéaire) ; hors image = transparent.
+        // Filtres CSS sur les valeurs sRGB : invert(i) puis contrast(c).
+        function matMul3(A, B) {
+            const C = [[0,0,0],[0,0,0],[0,0,0]];
+            for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++)
+                C[i][j] = A[i][0]*B[0][j] + A[i][1]*B[1][j] + A[i][2]*B[2][j];
+            return C;
+        }
+        function inv3(m) {
+            const [a,b,c] = m[0], [d,e,f] = m[1], [g,h,i] = m[2];
+            const A = e*i - f*h, B = -(d*i - f*g), C = d*h - e*g;
+            const det = a*A + b*B + c*C;
+            if (Math.abs(det) < 1e-12) return null;
+            return [[A/det, -(b*i - c*h)/det, (b*f - c*e)/det],
+                    [B/det, (a*i - c*g)/det, -(a*f - c*d)/det],
+                    [C/det, -(a*h - b*g)/det, (a*e - b*d)/det]];
+        }
+        function renderTransformed() {
+            const W = canvas.width, Hh = canvas.height;
+            const cssW = canvas.offsetWidth || W, cssH = canvas.offsetHeight || Hh;
+            const k = W / cssW;                                    // pixels par px CSS
+            const rad = v => (+v) * Math.PI / 180;
+            const ax = rad(transform.rotateX), ay = rad(transform.rotateY), az = rad(transform.rotateZ);
+            const sc = +transform.scale, kx = Math.tan(rad(transform.skewX)), ky = Math.tan(rad(transform.skewY));
+            const Rx = [[1,0,0],[0,Math.cos(ax),-Math.sin(ax)],[0,Math.sin(ax),Math.cos(ax)]];
+            const Ry = [[Math.cos(ay),0,Math.sin(ay)],[0,1,0],[-Math.sin(ay),0,Math.cos(ay)]];
+            const Rz = [[Math.cos(az),-Math.sin(az),0],[Math.sin(az),Math.cos(az),0],[0,0,1]];
+            const S  = [[sc,0,0],[0,sc,0],[0,0,1]];
+            const Kx = [[1,kx,0],[0,1,0],[0,0,1]];
+            const Ky = [[1,0,0],[ky,1,0],[0,0,1]];
+            const M = [Rx, Ry, Rz, S, Kx, Ky].reduce(matMul3);
+            const d = Math.max(1, +transform.perspective);
+            // Plan (x, y, 1) → écran homogène (X, Y, w), w = 1 − Z/d
+            const H = [[M[0][0], M[0][1], 0], [M[1][0], M[1][1], 0], [-M[2][0]/d, -M[2][1]/d, 1]];
+            const Hi = inv3(H);
+            const src = ctx.getImageData(0, 0, W, Hh).data;
+            const out = new ImageData(W, Hh), o = out.data;
+            const inv = (+transform.invert) / 100, con = (+transform.contrast) / 100;
+            const lut = new Uint8ClampedArray(256);
+            for (let v = 0; v < 256; v++) {
+                let c = v / 255;
+                c = c * (1 - inv) + (1 - c) * inv;
+                c = c * con + 0.5 * (1 - con);
+                lut[v] = Math.round(c * 255);
+            }
+            if (Hi) {
+                for (let j = 0; j < Hh; j++) {
+                    const v = (j + 0.5) / k - cssH / 2;
+                    for (let i = 0; i < W; i++) {
+                        const u = (i + 0.5) / k - cssW / 2;
+                        const ww = Hi[2][0]*u + Hi[2][1]*v + Hi[2][2];
+                        if (ww <= 0) continue;
+                        const x = (Hi[0][0]*u + Hi[0][1]*v + Hi[0][2]) / ww;
+                        const y = (Hi[1][0]*u + Hi[1][1]*v + Hi[1][2]) / ww;
+                        // Point du plan derrière l'observateur : non visible
+                        if (1 - (M[2][0]*x + M[2][1]*y) / d <= 0) continue;
+                        const sx = (x + cssW / 2) * k - 0.5, sy = (y + cssH / 2) * k - 0.5;
+                        if (sx < -0.5 || sy < -0.5 || sx > W - 0.5 || sy > Hh - 0.5) continue;
+                        const x0 = Math.max(0, Math.floor(sx)), y0 = Math.max(0, Math.floor(sy));
+                        const x1 = Math.min(W - 1, x0 + 1), y1 = Math.min(Hh - 1, y0 + 1);
+                        const fx = Math.min(1, Math.max(0, sx - x0)), fy = Math.min(1, Math.max(0, sy - y0));
+                        const p00 = (y0*W + x0) * 4, p10 = (y0*W + x1) * 4, p01 = (y1*W + x0) * 4, p11 = (y1*W + x1) * 4;
+                        const q = (j*W + i) * 4;
+                        for (let c = 0; c < 4; c++) {
+                            const val = (src[p00+c]*(1-fx) + src[p10+c]*fx) * (1-fy) + (src[p01+c]*(1-fx) + src[p11+c]*fx) * fy;
+                            o[q+c] = c < 3 ? lut[Math.round(val)] : val;
+                        }
+                    }
+                }
+            }
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = W; tempCanvas.height = Hh;
+            tempCanvas.getContext('2d').putImageData(out, 0, 0);
+            return tempCanvas;
+        }
+
+        function saveImage() {
+            if (!originalImage) return;
+            const tempCanvas = renderTransformed();
+            tempCanvas.toBlob(function(blob) {
+                if (!blob) { alert('Enregistrement impossible : image non exportable.'); return; }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'image_corrigee.png';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 10000);
+            }, 'image/png');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+# ==============================================================================
+#  Nom / Name : CITATION.cff
+#  Projet     : photo — https://github.com/ericperret/photo
+#  Auteur     : Eric PERRET
+#  Date       : 2026-10-27
+#  Version    : 1.0
+#  Objet      : métadonnées de citation (bouton « Cite this repository » de GitHub)
+#  Licence    : CC BY-NC 4.0 — usage commercial sur autorisation écrite (eperret@azs.fr)
+# ==============================================================================
+cff-version: 1.2.0
+message: "If you use or cite this work, please credit it as below. / Merci de citer ce travail comme ci-dessous."
+type: software
+title: "Browser image tools — perspective correction, JPEG forensics, GeoTIFF"
+abstract: "Browser image tools: perspective correction and deskew for OCR/AI preprocessing, YUV levels, JPEG forensics, GeoTIFF/HGT inspector, DEM tile downloader. Pure HTML/JS, offline."
+authors:
+  - family-names: "PERRET"
+    given-names: "Eric"
+    email: "eperret@azs.fr"
+repository-code: "https://github.com/ericperret/photo"
+url: "https://ericperret.github.io/photo/"
+license: CC-BY-NC-4.0
+date-released: "2026-10-27"
+keywords:
+  - perspective-correction
+  - deskew
+  - document-scanner
+  - homography
+  - image-alignment
+  - image-processing
+  - ocr-preprocessing
+  - jpeg
+  - image-forensics
+  - histogram
+  - geotiff
+  - dem
+  - html5-canvas
+  - javascript
+  - vanilla-javascript
+  - no-dependencies
+  - offline
